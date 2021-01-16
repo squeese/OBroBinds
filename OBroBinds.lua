@@ -1,7 +1,43 @@
 local _, addon = ...
 local next = unpack(addon)
+local InitializeGUI, UpdateStanceButtons, UpdateActionButtons
 
-function addon:Initialize()
+BINDING_HEADER_OBROBINDS = 'OBroBinds'
+BINDING_NAME_TOGGLE_CONFIG = 'Toggle Config Panel'
+function OBroBinds_Toggle()
+  local root = InitializeGUI()
+  local open = false
+  OBroBinds_Toggle = function()
+    if not open then
+      root:Show()
+      -- next(addon, addon.UpdateStanceButtons)
+      -- next(addon, addon.UpdateActionButtons, addon.DEFAULT_KEYBOARD_LAYOUT)
+      -- next(frame, frame.UpdateStanceButtonsLayout)
+      -- next(frame, frame.UpdateActionButtonsLayout, addon.DEFAULT_KEYBOARD_LAYOUT)
+      -- dispatch("MODIFIER_CHANGED", GetModifier())
+    else
+      root:Hide()
+    end
+    open = not open
+  end
+  OBroBinds_Toggle()
+end
+
+
+do -- TMP, open on loading
+  local frame = CreateFrame("frame")
+  frame:RegisterEvent("VARIABLES_LOADED")
+  frame:SetScript("OnEvent", function(self)
+    self:UnregisterEvent("VARIABLES_LOADED")
+    self:SetScript("OnEvent", nil)
+    print("click toggle")
+    OBroBinds_Toggle()
+  end)
+end
+
+function InitializeGUI()
+  local subscribe, dispatch, unsubscribe = select(6, unpack(addon))
+
   -- create and style the main window
   local frame = CreateFrame("frame", nil, UIParent, "BackdropTemplate")
   frame:SetFrameStrata("DIALOG")
@@ -16,7 +52,6 @@ function addon:Initialize()
     insets = { left = 11, right = 12, top = 12, bottom = 11 }
   })
 
-  local subscribe, dispatch, unsubscribe = select(6, unpack(self))
 
   -- create the stance buttons and an update handler for when the player changes specc
   do
@@ -45,13 +80,12 @@ function addon:Initialize()
     local class = select(2, UnitClass("player"))
     if class == "ROGUE" then
       CreateStanceButton(72, "ability_stealth", nil)
-      self.UpdateStanceButtons = nil
 
     elseif class == "DRUID" then
       local stanceButtonBear = CreateStanceButton(97, 'ability_racial_bearform', nil)
       local stanceButtonCat = CreateStanceButton(72, 'ability_druid_catform', stanceButtonBear)
       local stanceButtonBoom = nil
-      self.UpdateStanceButtons = function()
+      function UpdateStanceButtons()
         if GetSpecialization() == 1 then
           stanceButtonBoom = stanceButtonBoom or CreateStanceButton(109, 'spell_nature_forceofnature', stanceButtonCat)
           if not stanceButtonBoom:IsVisible() then
@@ -66,10 +100,6 @@ function addon:Initialize()
           stanceButtonBoom:Hide()
         end
       end
-
-    else
-      -- ignore stance buttons for all other classes
-      self.UpdateStanceButtons = nil
     end
   end
 
@@ -85,39 +115,16 @@ function addon:Initialize()
   end
   ]]
 
-  -- remove refence to this function, as it's not needed anynmore
-  self.Initialize = nil
+  -- remove refence to this function and let the GC collect it, since it's only run once
+  InitializeGUI = nil
+
   return frame
 end
 
 
-do
-  BINDING_HEADER_OBROBINDS = 'OBroBinds'
-  BINDING_NAME_TOGGLE_CONFIG = 'Toggle Config Panel'
-  function OBroBinds_Toggle()
-    local root = addon:Initialize()
-    local open = false
-    OBroBinds_Toggle = function()
-      if not open then
-        next(addon, addon.UpdateStanceButtons)
-        -- next(addon, addon.UpdateActionButtons, addon.DEFAULT_KEYBOARD_LAYOUT)
 
 
-
-
-        -- next(frame, frame.UpdateStanceButtonsLayout)
-        -- next(frame, frame.UpdateActionButtonsLayout, addon.DEFAULT_KEYBOARD_LAYOUT)
-        -- dispatch("MODIFIER_CHANGED", GetModifier())
-        root:Show()
-      else
-        root:Hide()
-      end
-      open = not open
-    end
-    OBroBinds_Toggle()
-  end
-end
-
+--[[
 do
   local elapsed
   local function OnUpdate(self, delta)
@@ -135,17 +142,7 @@ do
     self:SetScript("OnUpdate", OnUpdate)
   end)
 end
-
-do -- TMP, open on loading
-  local frame = CreateFrame("frame")
-  frame:RegisterEvent("VARIABLES_LOADED")
-  frame:SetScript("OnEvent", function(self)
-    self:UnregisterEvent("VARIABLES_LOADED")
-    self:SetScript("OnEvent", nil)
-    OBroBinds_Toggle()
-  end)
-end
-
+]]
 
 
 --[[

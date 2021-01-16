@@ -6,10 +6,4 @@
 ## SavedVariables: OBroBindsDB
 
 deps/utilities.lua
-
-# deps/utils.layout.lua
-# deps/layouts.keyboard.lua
-# deps/CreateStanceButtons.lua
-# deps/CreateActionButtons.lua
-
 OBroBinds.lua
