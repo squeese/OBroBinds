@@ -1,0 +1,15 @@
+## Interface: 90002
+## Author: OreeBroo - Draenor
+## Version: 1.0
+## Title: |cff1784d1OBroBinds|r
+## Notes: Kybinding spells/macro's via GUI
+## SavedVariables: OBroBindsDB
+
+deps/utilities.lua
+
+# deps/utils.layout.lua
+# deps/layouts.keyboard.lua
+# deps/CreateStanceButtons.lua
+# deps/CreateActionButtons.lua
+
+OBroBinds.lua
