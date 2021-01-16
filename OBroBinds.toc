@@ -5,5 +5,8 @@
 ## Notes: Kybinding spells/macro's via GUI
 ## SavedVariables: OBroBindsDB
 
-deps/utilities.lua
+deps/util.funcs.lua
+deps/util.gui.lua
+deps/util.layout.lua
+deps/layouts.lua
 OBroBinds.lua

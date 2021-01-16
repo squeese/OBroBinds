@@ -2,6 +2,22 @@ local _, addon = ...
 local tinsert = table.insert
 local tremove = table.remove
 
+do
+  local ref = setmetatable({}, {__mode = 'v'})
+  function addon.REF(name, fn)
+    print("REF", fn, name)
+    tinsert(ref, fn)
+  end
+  function addon.REPORT()
+    collectgarbage("collect")
+    print("REPORT BEG", #ref)
+    for key, val in pairs(ref) do
+      print(val, key)
+    end
+    print("REPORT END")
+  end
+end
+
 local function next(self, fn, ...)
   if self and fn then
     return fn(self, ...)
@@ -144,12 +160,12 @@ end
 -- would be the value 1, and since lua tables are not zero index, 'lowest' value must be 1
 do
   local bbor = bit.bor
-  local function ModifierFlag()
+  local function getModifier()
     return bbor(
       1,
       (IsShiftKeyDown() and 2 or 0),
       (IsControlKeyDown() and 4 or 0),
       (IsAltKeyDown() and 8 or 0))
   end
-  tinsert(addon, ModifierFlag) -- 11
+  tinsert(addon, getModifier) -- 11
 end
