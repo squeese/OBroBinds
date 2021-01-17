@@ -19,8 +19,8 @@ do
 end
 
 local function next(self, fn, ...)
-  --if self and fn then
-  if fn then
+  if self and fn then
+  -- if fn then
     return fn(self, ...)
   end
   return self
@@ -69,10 +69,16 @@ end
 -- subscribe(key, table, [handlerfunction])
 -- dispatch(key, [...arguments)]
 -- unsubscribe(key, table)
+local subscribe, unsubscribe
 do
   local subscriptions = {}
 
-  local function subscribe(key, tbl, func)
+  function subscribe(key, tbl, func)
+    if type(tbl) == 'function' then
+      func, tbl = tbl, {}
+      addon.REF("random sub func", func)
+      addon.REF("random sub table", tbl)
+    end
     tbl[key] = func or tbl[key] or next
     if not subscriptions[key] then
       subscriptions[key] = {}
@@ -82,6 +88,7 @@ do
       if tbl == subs[i] then return end
     end
     tinsert(subs, 1, tbl)
+    return tbl, func
   end
   tinsert(addon, subscribe) -- 6
 
@@ -95,12 +102,15 @@ do
   end
   tinsert(addon, dispatch) -- 7
 
-  local function unsubscribe(key, tbl)
+  function unsubscribe(key, tbl, removefn)
     local subs = subscriptions[key]
     if not subs then return end
     for i = #subs, 1, -1 do
       if subs[i] == tbl then
         tremove(subs, i)
+        if removefn then
+          tbl[key] = nil
+        end
         return
       end
     end
@@ -108,19 +118,30 @@ do
   tinsert(addon, unsubscribe) -- 8
 end
 
--- helper function to write to the OBroBindsDB (savedvariables table)
--- last argument is the value to write, and the preceding arguments are the path down the table.
---   write("PRIEST", "F2", "enabled", true)
--- the results would be:
---   OBroBindsDB = { ["PRIEST"] = { ["F2"] = { ["enabled"] = true }}}
--- it is safe to write to a table that doesnt exist yet, the tables will be created
--- as it traverses along the path, and it will also remove empty tables as it traverses
--- back, so if we call
---   write("PRIEST", "F2", "enabled", nil)
--- with nil as value, the result would be
--- OBroBindsDB = nil
--- because there would only be empty tables left
+--[[
 do
+  local function once(key, fn, tbl)
+    subscribe(key, (tbl or {}), function(self, ...)
+      fn(...)
+      unsubscribe(key, self, true)
+    end)
+  end
+end
+]]
+
+do
+  -- helper function to write to the OBroBindsDB (savedvariables table)
+  -- last argument is the value to write, and the preceding arguments are the path down the table.
+  --   write("PRIEST", "F2", "enabled", true)
+  -- the results would be:
+  --   OBroBindsDB = { ["PRIEST"] = { ["F2"] = { ["enabled"] = true }}}
+  -- it is safe to write to a table that doesnt exist yet, the tables will be created
+  -- as it traverses along the path, and it will also remove empty tables as it traverses
+  -- back, so if we call
+  --   write("PRIEST", "F2", "enabled", nil)
+  -- with nil as value, the result would be
+  -- OBroBindsDB = nil
+  -- because there would only be empty tables left
   local function write(tbl, key, ...)
     if not tbl then
       return write({}, key, ...)
@@ -138,20 +159,25 @@ do
     end
     return nil
   end
-  tinsert(addon, function(arg1, ...)
-    OBroBindsDB = write(OBroBindsDB, (arg1 or select(2, UnitClass("player"))), ...) -- 9
-  end)
-end
 
--- helper function to read from the OBroBindsDB (savedvariables table)
-do
+  -- helper function to read from the OBroBindsDB (savedvariables table)
   function read(tbl, key, ...)
     if not tbl then return nil end
     if not key then return tbl end
     return read(tbl[key], ...)
   end
+
+  local class
+  subscribe("INITIALIZE", {}, function(self, ...)
+    class = select(3, ...)
+    unsubscribe("INITIALIZE", self, true)
+  end)
+
   tinsert(addon, function(arg1, ...)
-    return read(OBroBindsDB, (arg1 or select(2, UnitClass("player"))), ...) -- 10
+    OBroBindsDB = write(OBroBindsDB, (arg1 or class), ...) -- 9
+  end)
+  tinsert(addon, function(arg1, ...)
+    return read(OBroBindsDB, (arg1 or class), ...) -- 10
   end)
 end
 
@@ -176,8 +202,10 @@ do
     return select("#", ...) > 0 and next(val, match, ...) or false
   end
   tinsert(addon, match)
+end
 
-  --[[
+--[[
+do
   local function filter(self, fn, arg1, ...)
     if not arg1 then return self end
     return next(fn(arg1) and rpush(self or {}, arg1) or self, filter, fn, ...)
@@ -187,5 +215,5 @@ do
     if not stance then return self end
     return next(stance.class == class and rpush(self or {}, stance) or self, validStances, ...)
   end
-  ]]
 end
+]]

@@ -6,7 +6,7 @@
 ## SavedVariables: OBroBindsDB
 
 deps/util.funcs.lua
-deps/util.gui.lua
-deps/util.layout.lua
+deps/gui.stanceButtons.lua
+deps/gui.actionButtons.lua
 deps/layouts.lua
 OBroBinds.lua
