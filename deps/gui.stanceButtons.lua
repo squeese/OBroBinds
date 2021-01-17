@@ -1,5 +1,5 @@
 local _, addon = ...
-local next, _, rpush, _, _, subscribe, dispatch, unsubscribe, dbWrite, dbRead, _, match = unpack(addon)
+local next, _, rpush, _, _, subscribe, dispatch, unsubscribe, write, read, dbWrite, dbRead, _, match = unpack(addon)
 
 local function OnStanceButtonUpdate(self, offset)
   next(self.Border, self.__offset == offset and self.Border.Show or self.Border.Hide)
@@ -14,43 +14,36 @@ local function OnStanceButtonClick(self)
 end
 addon.REF("OnStanceButtonClick", OnStanceButtonClick)
 
-local OnSpecializationChanged
-do
-  local function ResetStanceButton(button, anchor)
-    button:Show()
-    button:ClearAllPoints()
-    if not anchor then
-      button:SetPoint("TOPLEFT", 16, 34)
-    else
-      button:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
-    end
-    return button
-  end
-  addon.REF("ResetStanceButton", ResetStanceButton)
-
-  function OnSpecializationChanged(self)
-    local spec = GetSpecialization()
-    if self.spec == spec then return end
-    self.spec = spec
-    local offset = dbRead(nil, "offset")
-    local prev, valid
-    for _, button in ipairs(self) do
-      if match(spec, unpack(button)) then
-        prev = ResetStanceButton(button, prev)
-        OnStanceButtonUpdate(button, offset)
-        valid = valid or not offset or offset == button.__offset
+local function OnSpecializationChanged(self)
+  local spec = GetSpecialization()
+  if self.spec == spec then return end
+  self.spec = spec
+  local offset = dbRead(nil, "offset")
+  local prev, valid
+  for _, button in ipairs(self) do
+    if match(spec, unpack(button)) then
+      button:Show()
+      button:ClearAllPoints()
+      if not prev then
+        button:SetPoint("TOPLEFT", 16, 34)
       else
-        button:Hide()
+        button:SetPoint("LEFT", prev, "RIGHT", 4, 0)
       end
-    end
-    if not valid then
-      print("reset offset")
-      dbWrite(nil, "offset", nil)
-      dispatch("OFFSET_CHANGED", nil)
+      subscribe("OFFSET_CHANGED", button)
+      OnStanceButtonUpdate(button, offset)
+      valid = valid or not offset or offset == button.__offset
+      prev = button
+    else
+      button:Hide()
+      unsubscribe("OFFSET_CHANGED", button)
     end
   end
-  addon.REF("OnSpecializationChanged", OnSpecializationChanged)
+  if not valid then
+    dbWrite(nil, "offset", nil)
+    dispatch("OFFSET_CHANGED", nil)
+  end
 end
+addon.REF("OnSpecializationChanged", OnSpecializationChanged)
 
 do
   local stances = {
@@ -70,7 +63,7 @@ do
         button.icon:SetTexture("Interface/Icons/"..stance.icon)
         button:RegisterForClicks("AnyUp")
         button:SetScript("OnClick", OnStanceButtonClick)
-        subscribe("OFFSET_CHANGED", button, OnStanceButtonUpdate)
+        button.OFFSET_CHANGED = OnStanceButtonUpdate
         rpush(buttons, rpush(button, unpack(stance)))
       end
     end

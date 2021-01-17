@@ -14,7 +14,7 @@ do
     for key, val in pairs(ref) do
       print(val, key)
     end
-    print("REPORT END")
+    --print("REPORT END")
   end
 end
 
@@ -74,6 +74,7 @@ do
   local subscriptions = {}
 
   function subscribe(key, tbl, func)
+    --print("sub", key, tbl, func)
     if type(tbl) == 'function' then
       func, tbl = tbl, {}
       addon.REF("random sub func", func)
@@ -88,15 +89,16 @@ do
       if tbl == subs[i] then return end
     end
     tinsert(subs, 1, tbl)
-    return tbl, func
   end
   tinsert(addon, subscribe) -- 6
 
   local function dispatch(key, ...)
+    --print("DISPATCH", key, ...)
     local subs = subscriptions[key]
     if not subs then return end
     for i = #subs, 1, -1 do
       local tbl = subs[i]
+      --print(">>", tbl, tbl[key], ...)
       next(tbl, tbl[key], ...)
     end
   end
@@ -147,18 +149,20 @@ do
       return write({}, key, ...)
     elseif type(key) == 'function' then
       tbl = key(tbl, ...)
-    elseif select("#", ...) > 1 then
+    elseif select("#", ...) > 0 then
       tbl[key] = write(tbl[key], ...)
     else
-      tbl[key] = select(1, ...)
+      return key
     end
-    if tbl then
-      for _ in pairs(tbl) do
-        return tbl
-      end
+    if type(tbl) ~= 'table' then
+      return tbl
+    end
+    for _ in pairs(tbl) do
+      return tbl
     end
     return nil
   end
+  tinsert(addon, write)
 
   -- helper function to read from the OBroBindsDB (savedvariables table)
   function read(tbl, key, ...)
@@ -166,6 +170,7 @@ do
     if not key then return tbl end
     return read(tbl[key], ...)
   end
+  tinsert(addon, read)
 
   local class
   subscribe("INITIALIZE", {}, function(self, ...)
@@ -174,6 +179,7 @@ do
   end)
 
   tinsert(addon, function(arg1, ...)
+    print("dbWrite", arg1, ...)
     OBroBindsDB = write(OBroBindsDB, (arg1 or class), ...) -- 9
   end)
   tinsert(addon, function(arg1, ...)

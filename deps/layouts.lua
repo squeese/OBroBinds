@@ -1,5 +1,5 @@
 local _, addon = ...
-local colSet, colAdd, rowSet, rowAdd, _, buttonRow = select(13, unpack(addon))
+local colSet, colAdd, rowSet, rowAdd, _, buttonRow = select(15, unpack(addon))
 
 --for i = 1, #addon do
   --print("??", i, addon[i])
@@ -8,6 +8,7 @@ local colSet, colAdd, rowSet, rowAdd, _, buttonRow = select(13, unpack(addon))
 --print("colAdd?", colAdd)
 
 addon.DEFAULT_KEYBOARD_LAYOUT = {
+  --buttonRow, colAdd, 1, "1 2 3 4",
   colSet, -1,              buttonRow, colAdd, 1, "F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 PRINT PAUSE DEL",
   colSet, 0,   rowAdd, 1, buttonRow, colAdd, 1, "` 1 2 3 4 5 6 7 8 9 0 - =",
   colSet, 1.3, rowAdd, 1, buttonRow, colAdd, 1, "q w e r t y u i o p [ ]",
