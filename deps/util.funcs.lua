@@ -19,7 +19,8 @@ do
 end
 
 local function next(self, fn, ...)
-  if self and fn then
+  --if self and fn then
+  if fn then
     return fn(self, ...)
   end
   return self
@@ -137,8 +138,8 @@ do
     end
     return nil
   end
-  tinsert(addon, function(...)
-    OBroBindsDB = write(OBroBindsDB, ...) -- 9
+  tinsert(addon, function(arg1, ...)
+    OBroBindsDB = write(OBroBindsDB, (arg1 or select(2, UnitClass("player"))), ...) -- 9
   end)
 end
 
@@ -147,10 +148,10 @@ do
   function read(tbl, key, ...)
     if not tbl then return nil end
     if not key then return tbl end
-    return dbRead(tbl[key], ...)
+    return read(tbl[key], ...)
   end
-  tinsert(addon, function(...)
-    return read(OBroBindsDB, ...) -- 10
+  tinsert(addon, function(arg1, ...)
+    return read(OBroBindsDB, (arg1 or select(2, UnitClass("player"))), ...) -- 10
   end)
 end
 
@@ -161,11 +162,30 @@ end
 do
   local bbor = bit.bor
   local function getModifier()
-    return bbor(
-      1,
+    return bbor(1,
       (IsShiftKeyDown() and 2 or 0),
       (IsControlKeyDown() and 4 or 0),
       (IsAltKeyDown() and 8 or 0))
   end
   tinsert(addon, getModifier) -- 11
+end
+
+do
+  local function match(val, arg, ...)
+    if val == arg then return true end
+    return select("#", ...) > 0 and next(val, match, ...) or false
+  end
+  tinsert(addon, match)
+
+  --[[
+  local function filter(self, fn, arg1, ...)
+    if not arg1 then return self end
+    return next(fn(arg1) and rpush(self or {}, arg1) or self, filter, fn, ...)
+  end
+  --tinsert(addon, filter) 
+  local function validStances(self, stance, ...)
+    if not stance then return self end
+    return next(stance.class == class and rpush(self or {}, stance) or self, validStances, ...)
+  end
+  ]]
 end

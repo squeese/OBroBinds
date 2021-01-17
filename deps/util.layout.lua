@@ -1,25 +1,23 @@
 local _, addon = ...
 local next, _, rpush, clean = unpack(addon)
 local tinsert = table.insert
+local mmax = math.max
 
 do
   local function init(self, parent, ...)
     self._p = parent
     self._c = 0 -- index of the next button to use
     self._s = 40 -- size of the button
-    self._x, self._xmin, self._xmax = 0, 0, 0 -- current x position
-    self._y, self._ymin, self._ymax = 0, 0, 0 -- current y position
+    self._x, self._xmin, self._xmax = 0, UIParent:GetRight(), UIParent:GetLeft()
+    self._y, self._ymin, self._ymax = 0, UIParent:GetTop(), UIParent:GetBottom()
     return next(self, ...)
   end
-  print("init", init)
   tinsert(addon, init)
 end
 
 do
   local function cleanup(self, ...)
-    local w = self._xmax - self._xmin + self._s - 16
-    local h = self._ymax - self._ymin + self._s - 12
-    self._p:SetSize(w, h)
+    self._p:SetSize(self._xmax - self._xmin + 32, self._ymax - self._ymin + 32)
     self._p, self._s, self._x, self._y, self._xmin, self._xmax, self._ymin, self._ymax = nil
     for i = self._c+1, #self do
       print("cleanup button", i, self[i])
@@ -29,59 +27,54 @@ do
   tinsert(addon, cleanup)
 end
 
-local colSet, colAdd, rowSet, rowAdd
-do
-  local mmin = math.min
-  local mmax = math.max
-  local function setMinMax(self, min, max, v)
-    self[min] = mmin(self[min], v)
-    self[max] = mmax(self[max], v)
-    return v
-  end
-
-  function colSet(self, x, ...)
-    print("colSet", x, self._x, self._y, self._xmin, self._xmax, self._y, self._ymin, self._ymax)
-    self._x = setMinMax(self, '_xmin', '_xmax', self._s * x)
-    return next(self, ...)
-  end
-  print("colSet!", colSet)
-  tinsert(addon, colSet)
-
-  function colAdd(self, x, ...)
-    self._x = setMinMax(self, '_xmin', '_xmax', self._x + self._s * x)
-    return next(self, ...)
-  end
-  tinsert(addon, colAdd)
-
-  function rowSet(self, y, ...)
-    self._y = setMinMax(self, '_ymin', '_ymax', self._s * y)
-    return next(self, ...)
-  end
-  tinsert(addon, rowSet)
-
-  function rowAdd(self, y, ...)
-    self._y = setMinMax(self, '_ymin', '_ymax', self._y + self._s * y)
-    return next(self, ...)
-  end
-  tinsert(addon, rowAdd)
+local function colSet(self, x, ...)
+  self._x = mmax(0, self._s * x)
+  return next(self, ...)
 end
+tinsert(addon, colSet)
+
+local function colAdd(self, x, ...)
+  self._x = mmax(0, self._x + self._s * x)
+  return next(self, ...)
+end
+tinsert(addon, colAdd)
+
+local function rowSet(self, y, ...)
+  self._y = mmax(0, self._s * y)
+  return next(self, ...)
+end
+tinsert(addon, rowSet)
+
+local function rowAdd(self, y, ...)
+  self._y = mmax(0, self._y + self._s * y)
+  return next(self, ...)
+end
+tinsert(addon, rowAdd)
 
 do
-  local function button(self, key, ...)
-    self._c = self._c + 1
-    local button
-    if self._c > #self then
-      button = addon.CreateActionButton(self._p)
-      tinsert(self, button)
-    else
-      button = self[self._c]
+  local button
+  do
+    local mmin = math.min
+    function button(self, key, ...)
+      self._c = self._c + 1
+      local button
+      if self._c > #self then
+        button = addon.CreateActionButton(self._p)
+        tinsert(self, button)
+      else
+        button = self[self._c]
+      end
+      button.__key = key
+      button.HotKey:SetText(key)
+      button:SetPoint("TOPLEFT", 16 + self._x, -self._y - 16)
+      self._xmin = mmin(self._xmin, button:GetLeft())
+      self._xmax = mmax(self._xmax, button:GetRight())
+      self._ymin = mmin(self._ymin, button:GetBottom())
+      self._ymax = mmax(self._ymax, button:GetTop())
+      return next(self, ...)
     end
-    button.__key = key
-    button.HotKey:SetText(key)
-    button:SetPoint("TOPLEFT", 16 + self._x, -self._y - 16)
-    return next(self, ...)
+    tinsert(addon, button)
   end
-  tinsert(addon, button)
 
   do
     local __tmp = {}
