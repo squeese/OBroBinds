@@ -7,29 +7,59 @@ BINDING_HEADER_OBROBINDS = 'OBroBinds'
 BINDING_NAME_TOGGLE_CONFIG = 'Toggle Config Panel'
 function OBroBinds_Toggle()
   local frame = CreateFrame("frame", nil, UIParent, "BackdropTemplate")
-  --OBroBindsDB = nil
   dispatch("INITIALIZE", frame, UnitClass("player"))
   dispatch("LAYOUT_CHANGED", addon.DEFAULT_KEYBOARD_LAYOUT)
+
+  print("?", GetBindingKey("SPELL Rejuvenation"))
+
+  --C_Timer.After(2, function()
+    --local spell = "Rejuvenation"
+    ---- SetBindingSpell("5", spell)
+    ---- SaveBindings(2)
+
+    --print("GetCurrentBindingSet", GetCurrentBindingSet())
+    --print(5, GetBindingAction("5", false))
+    --print(5, GetBindingAction("5", true))
+
+    --print(GetSpellInfo(spell))
+  --end)
+
+      -- print("?", )
+
+
+  local elapsed, current = 0, getModifier()
+  dispatch("MODIFIER_CHANGED", current)
+  frame:SetScript("OnUpdate", function(_, delta)
+    elapsed = elapsed + delta
+    if elapsed > 0.1 then
+      elapsed = 0
+      local modifier = getModifier()
+      if current ~= modifier then
+        current = modifier
+        dispatch("MODIFIER_CHANGED", current)
+      end
+    end
+  end)
+
+  --C_Timer.After(2, function()
+    --local mods = {}
+    --if IsAltKeyDown() then rpush(mods, "ALT") end
+    --if IsControlKeyDown() then rpush(mods, "CTRL") end
+    --if IsShiftKeyDown() then rpush(mods, "SHIFT") end
+    --rpush(mods, "1")
+    --local binding = strjoin("-", unpack(mods))
+    --print("binding", binding)
+    --local action = GetBindingAction(binding)
+    --print("action", action)
+  --end)
+
+  --frame:EnableKeyboard(true)
+  --frame:SetScript("OnKeyDown", function(_, key)
+    --frame:SetScript("OnKeyDown", nil)
+    --frame:EnableKeyboard(false)
+  --end)
+
   local open = false
-
-  --if OBroBindsDB ~= nil then
-    --C_Timer.After(1, ReloadUI)
-  --else
-    --dbWrite(nil, "test2", "deeper", function(entry)
-      --entry.age = 5
-      --return entry
-    --end, 1, 2, 3)
-    --print("--------")
-    --dbWrite(nil, "test4", "deeper", function(entry)
-      --entry.age = 4
-      --return entry
-    --end)
-    --print("--------")
-    --dbWrite(nil, 8, 4)
-    --dbWrite(nil, 9, 4)
-    --dbWrite(nil, 8, nil)
-  --end
-
   OBroBinds_Toggle = function()
     if not open then
       elapsed = 0
@@ -80,18 +110,6 @@ subscribe("INITIALIZE", addon, function(self, frame)
     self:UnregisterAllEvents()
   end)
 
-  local elapsed, current = 0, getModifier()
-  frame:SetScript("OnUpdate", function(_, delta)
-    elapsed = elapsed + delta
-    if elapsed > 0.1 then
-      elapsed = 0
-      local modifier = getModifier()
-      if current ~= modifier then
-        current = modifier
-        dispatch("MODIFIER_CHANGED", current)
-      end
-    end
-  end)
 
   do -- dev
     local reset = CreateFrame("button", nil, frame, "UIPanelButtonTemplate")

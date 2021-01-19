@@ -192,12 +192,24 @@ end
 -- first bit is always one, since we store the modifer in tables, no modifier pressed
 -- would be the value 1, and since lua tables are not zero index, 'lowest' value must be 1
 do
-  local bbor = bit.bor
+  --local bbor = bit.bor
+  --local function getModifier()
+    --return bbor(1,
+      --(IsShiftKeyDown() and 2 or 0),
+      --(IsControlKeyDown() and 4 or 0),
+      --(IsAltKeyDown() and 8 or 0))
+  --end
+  local mods = {}
   local function getModifier()
-    return bbor(1,
-      (IsShiftKeyDown() and 2 or 0),
-      (IsControlKeyDown() and 4 or 0),
-      (IsAltKeyDown() and 8 or 0))
+    if IsAltKeyDown() then tinsert(mods, "ALT") end
+    if IsControlKeyDown() then tinsert(mods, "CTRL") end
+    if IsShiftKeyDown() then tinsert(mods, "SHIFT") end
+    if #mods == 0 then return nil end
+    local modifier = strjoin("-", unpack(mods))
+    for i = 1, #mods do
+      mods[i] = nil
+    end
+    return modifier
   end
   tinsert(addon, getModifier) -- 11
 end
