@@ -6,46 +6,24 @@ local mmax = math.max
 local mmin = math.min
 local SPELL, MACRO, ITEM = 1, 2, 3
 
-local tmp = {}
-local function CreateBinding(key)
-  if IsAltKeyDown() then rpush(tmp, "ALT") end
-  if IsControlKeyDown() then rpush(tmp, "CTRL") end
-  if IsShiftKeyDown() then rpush(tmp, "SHIFT") end
-  rpush(tmp, key)
-  local binding = strjoin("-", unpack(tmp))
-  next(tmp, clean, tmp)
-  return binding
+local function increment(value)
+  return type(value) == 'number' and (value + 1) or 1
 end
-
-local regex = "[.*-]?([^-]*.)$"
-local function GetKeyFromBinding(binding)
-  return string.match(binding, regex)
-end
-
---local function increment(value)
-  --return type(value) == 'number' and (value + 1) or 1
---end
-
---local function decrement(value)
-  --if type(value) == 'number' and value > 1 then
-    --return value - 1
-  --end
---end
 
 subscribe("INITIALIZE", function(self, parent)
-
   local function OnActionButtonDragStart(self)
   end
 
   local function OnActionButtonReceiveDrag(self)
     local kind, id, _, arg1, arg2 = GetCursorInfo()
+    print(kind, id, arg1, arg2)
     ClearCursor()
     if kind == "spell" then
-      dispatch("CREATE_BINDING", { self.key, getModifier(), self.offset, SPELL, arg2 or arg1 })
+      --dispatch("CREATE_BINDING", { self.key, getModifier(), self.offset, SPELL, arg2 or arg1 })
     elseif kind == "macro" then
-      dispatch("CREATE_BINDING", { self.key, getModifier(), self.offset, MACRO, id })
+      -- dispatch("CREATE_BINDING", { self.key, getModifier(), self.offset, MACRO, id })
     elseif kind == "item" then
-      dispatch("CREATE_BINDING", { self.key, getModifier(), self.offset, ITEM, id })
+      -- dispatch("CREATE_BINDING", { self.key, getModifier(), self.offset, ITEM, id })
     elseif kind then
       assert(false, 'uncatched type: '..kind)
     end
@@ -53,13 +31,20 @@ subscribe("INITIALIZE", function(self, parent)
 
   local function OnActionButtonClick(self, button)
     if button == "RightButton" then
-      local binding = CreateBinding(self.key)
-      print("?", self.key, binding)
     elseif button == "LeftButton" then
     end
   end
 
-  local function OnActionButtonUpdate(self)
+  local function OnActionButtonUpdate(self, modifier)
+    --local binding = modifier..self.key
+    --local index = dbRead(nil, "mainbar", binding)
+    --if index then
+      --self.Border:Show()
+      --self.Border:SetAlpha(1.0)
+      --self.Name:SetText(index)
+    --else
+      --self.Border:Hide()
+    --end
   end
 
   local function CreateActionButton(self, key)
@@ -72,14 +57,12 @@ subscribe("INITIALIZE", function(self, parent)
       button:SetScript("OnClick", OnActionButtonClick)
       button:RegisterForDrag("LeftButton")
       button:RegisterForClicks("AnyUp")
-      --button.MODIFIER_CHANGED = OnModifierChanged
-      --button.OFFSET_CHANGED = OnOffsetChanged
-      --button.ORDER_CHANGED = OnOrderChanged
       button.Update = OnActionButtonUpdate
       tinsert(self, button)
     else
       button = self[self.index]
     end
+    self['key__'..key] = button
     button.key = key
     button:SetPoint("TOPLEFT", 16 + self.x, -self.y - 16)
     button.Border:Hide()
@@ -90,24 +73,6 @@ subscribe("INITIALIZE", function(self, parent)
     self.xmax = mmax(self.xmax, button:GetRight())
     self.ymin = mmin(self.ymin, button:GetBottom())
     self.ymax = mmax(self.ymax, button:GetTop())
-
-    subscribe("STANCE_BUTTON_APPEND", button, function(self, key, binding, index)
-      if key == self.key then
-        print("STANCE_BUTTON_APPEND", self.key, "//", key, binding, index)
-      end
-    end)
-
-    subscribe("MODIFIER_CHANGED", button, function(self, modifier)
-      --local binding = modifier and (modifier.."-"..self.key) or self.key
-      --local action = GetBindingAction(binding)
-      --if action:match("^SPELL") then
-        --local spell = strsub(action, 7)
-        --print(binding, action, spell, GetSpellInfo(spell))
-      --end
-      ----local spell = GetBindingSpell(binding)
-      ---- print(binding, action)
-    end)
-
   end
 
   subscribe("LAYOUT_CHANGED", self, function(_, layout)
@@ -117,50 +82,76 @@ subscribe("INITIALIZE", function(self, parent)
     self.size = 40 -- size of the button
     self.x, self.xmin, self.xmax = 0, UIParent:GetRight(), UIParent:GetLeft()
     self.y, self.ymin, self.ymax = 0, UIParent:GetTop(), UIParent:GetBottom()
-    self.modifier = getModifier()
-    subscribe("CREATE_ACTION_BUTTON", self, CreateActionButton)
+    self.CreateActionButton = CreateActionButton
     next(self, unpack(layout))
-    unsubscribe("CREATE_ACTION_BUTTON", self)
+
     local width = self.xmax - self.xmin + 32
     local height = self.ymax - self.ymin + 32
     parent:SetSize(width, height)
-    self.size, self.x, self.y, self.xmin, self.xmax, self.ymin, self.ymax, self.modifier = nil
+
+    self.size, self.x, self.y, self.xmin, self.xmax, self.ymin, self.ymax = nil
     for i = self.index+1, #self do
       local button = self[i]
       button:Hide()
-      -- unsubscribe("MODIFIER_CHANGED", button)
-      -- unsubscribe("OFFSET_CHANGED", button)
     end
 
-    C_Timer.After(1, function()
-      OBroBindsDB = nil
-      --dbWrite(nil, 'stance', rpush, "SHIFT-1", "1", "2", "CTRL-3")
-      --dbWrite(nil, 'binding', rpush, { "5", SPELL, 123 })
-      --dbWrite(nil, 'binding', rpush, { "8", SPELL, 234 })
-      --dbWrite(nil, 'binding', rpush, { "ALT-5", SPELL, 456 })
-      --local stance = dbRead(nil, 'stance')
-      --for index, binding in ipairs(stance) do
-        --dispatch("STANCE_BUTTON_APPEND", GetKeyFromBinding(binding), binding, index)
-      --end
-      --local bindings = dbRead(nil, 'bindings')
-      --for index, binding in ipairs(stance) do
-        ---- dispatch("BINDING", )
-      --end
+    local regex = "[.*-]?([^-]*.)$"
+    for index = 1, 12 do
+      local binding = GetBindingKey("ACTIONBUTTON"..index)
+      if binding then
+        local key = string.match(binding, regex)
+        local button = self['key__'..key]
+        write(button, 'bindings', increment)
+        write(button, binding, index)
 
-      --local action = GetBindingAction(binding)
-      --if action:match("^SPELL") then
-        --local spell = strsub(action, 7)
-        --print(binding, action, spell, GetSpellInfo(spell))
-      --end
-      ----local spell = GetBindingSpell(binding)
-      ---- print(binding, action)
-
-      for i = 1, GetNumBindings() do
-        -- print(i, GetBindInfo(i))
-        -- print(">", i, GetBinding(i))
+        --OnActionButtonUpdate(button)
+        button.Border:Show()
+        --button.HotKey:SetText(red(button, 'bindings'))
+        button.Name:SetText(read(button, binding))
       end
-    end)
+    end
+    local bindings = dbRead(nil, GetSpecialization(), 'bindings')
+    if bindings then
+      for binding in pairs(bindings) do
+        local key = string.match(binding, regex)
+        --print("ACTION_BINDING", key, binding)
+        --write(self['key__'..key], 'binds', increment)
+      end
+    end
   end)
+
+  do
+    --local regex = "^([^%d ]+)(%d?)%s?(.*)$"
+    local regex = "^(%w+) (.*)$"
+    local mods = {"", "ALT-", "CTRL-", "SHIFT-", "ALT-CTRL-", "ALT-SHIFT-", "ALT-CTRL-SHIFT-", "CTRL-SHIFT-"}
+    subscribe("SCAN", self, function()
+      OBroBindsDB = nil
+      local spec = GetSpecialization()
+      for i = 1, self.index do
+        local button = self[i]
+        for _, modifier in ipairs(mods) do
+          local binding = modifier..button.key
+          local action = GetBindingAction(binding)
+          local kind, info = string.match(action, regex)
+          if not kind then
+          elseif kind == "SPELL" then
+            local name, _, icon, _, _, _, id = GetSpellInfo(info)
+            if name == info then
+              dbWrite(nil, spec, 'bindings', binding, { SPELL, id, name = name })
+            end
+          elseif kind == "MACRO" then
+            local name, icon = GetMacroInfo(info)
+            if name == info then
+              dbWrite(nil, spec, 'bindings', binding, { MACRO, name })
+            end
+          elseif kind == "ITEM" then
+          end
+        end
+      end
+      ReloadUI()
+    end)
+  end
+
   unsubscribe("INITIALIZE", self, true)
 end)
 
@@ -191,7 +182,7 @@ tinsert(addon, rowAdd)
 
 do
   local function button(self, key, ...)
-    dispatch("CREATE_ACTION_BUTTON", key)
+    self:CreateActionButton(key)
     return next(self, ...)
   end
   tinsert(addon, button)

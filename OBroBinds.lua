@@ -1,7 +1,12 @@
 local _, addon = ...
 local next, _, rpush, _, _, subscribe, dispatch, unsubscribe, write, read, dbWrite, dbRead, getModifier, match = unpack(addon)
 
-
+-- GetCurrentBindingSet
+-- GetBindingKey
+-- GetBindingAction("5")
+-- SetBindingSpell("5", "Rejuvenation")
+-- GetSpellInfo(spell)
+-- GetKeyFromBinding(binding)
 
 BINDING_HEADER_OBROBINDS = 'OBroBinds'
 BINDING_NAME_TOGGLE_CONFIG = 'Toggle Config Panel'
@@ -9,55 +14,6 @@ function OBroBinds_Toggle()
   local frame = CreateFrame("frame", nil, UIParent, "BackdropTemplate")
   dispatch("INITIALIZE", frame, UnitClass("player"))
   dispatch("LAYOUT_CHANGED", addon.DEFAULT_KEYBOARD_LAYOUT)
-
-  print("?", GetBindingKey("SPELL Rejuvenation"))
-
-  --C_Timer.After(2, function()
-    --local spell = "Rejuvenation"
-    ---- SetBindingSpell("5", spell)
-    ---- SaveBindings(2)
-
-    --print("GetCurrentBindingSet", GetCurrentBindingSet())
-    --print(5, GetBindingAction("5", false))
-    --print(5, GetBindingAction("5", true))
-
-    --print(GetSpellInfo(spell))
-  --end)
-
-      -- print("?", )
-
-
-  local elapsed, current = 0, getModifier()
-  dispatch("MODIFIER_CHANGED", current)
-  frame:SetScript("OnUpdate", function(_, delta)
-    elapsed = elapsed + delta
-    if elapsed > 0.1 then
-      elapsed = 0
-      local modifier = getModifier()
-      if current ~= modifier then
-        current = modifier
-        dispatch("MODIFIER_CHANGED", current)
-      end
-    end
-  end)
-
-  --C_Timer.After(2, function()
-    --local mods = {}
-    --if IsAltKeyDown() then rpush(mods, "ALT") end
-    --if IsControlKeyDown() then rpush(mods, "CTRL") end
-    --if IsShiftKeyDown() then rpush(mods, "SHIFT") end
-    --rpush(mods, "1")
-    --local binding = strjoin("-", unpack(mods))
-    --print("binding", binding)
-    --local action = GetBindingAction(binding)
-    --print("action", action)
-  --end)
-
-  --frame:EnableKeyboard(true)
-  --frame:SetScript("OnKeyDown", function(_, key)
-    --frame:SetScript("OnKeyDown", nil)
-    --frame:EnableKeyboard(false)
-  --end)
 
   local open = false
   OBroBinds_Toggle = function()
@@ -110,6 +66,20 @@ subscribe("INITIALIZE", addon, function(self, frame)
     self:UnregisterAllEvents()
   end)
 
+  do
+    local elapsed, pAlt, pCtrl, pShift = 0
+    dispatch("MODIFIER_CHANGED", (pAlt and "ALT-" or "")..(pCtrl and "CTRL-" or "")..(pShift and "SHIFT-" or ""))
+    frame:SetScript("OnUpdate", function(_, delta)
+      elapsed = elapsed + delta
+      if elapsed > 0.1 then
+        elapsed = 0
+        local nAlt, nCtrl, nShift = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
+        if pAlt == nAlt and pCtrl == nCtrl and pShift == nShift then return end
+        pAlt, pCtrl, pShift = nAlt, nCtrl, nShift
+        dispatch("MODIFIER_CHANGED", (pAlt and "ALT-" or "")..(pCtrl and "CTRL-" or "")..(pShift and "SHIFT-" or ""))
+      end
+    end)
+  end
 
   do -- dev
     local reset = CreateFrame("button", nil, frame, "UIPanelButtonTemplate")
@@ -130,17 +100,16 @@ subscribe("INITIALIZE", addon, function(self, frame)
     reload:SetScript("OnClick", function()
       ReloadUI()
     end)
+
+    local scan = CreateFrame("button", nil, frame, "UIPanelButtonTemplate")
+    scan:SetSize(100, 32)
+    scan:SetPoint("RIGHT", reload, "LEFT", -16, 0)
+    scan:SetText("scan")
+    scan:RegisterForClicks("AnyUp")
+    scan:SetScript("OnClick", function()
+      dispatch("SCAN")
+    end)
   end
-
-  -- addon.CreateStanceButtons(frame)
-  -- addon.CreateStanceButtons = nil
-
-
-
-  -- create the action buttons
-  --[[
-  do
-  ]]
 
   unsubscribe("INITIALIZE", self, true)
 end)

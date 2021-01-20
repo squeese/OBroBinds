@@ -2,13 +2,13 @@ local _, addon = ...
 local next, _, rpush, _, _, subscribe, dispatch, unsubscribe, write, read, dbWrite, dbRead, _, match = unpack(addon)
 
 local function OnStanceButtonUpdate(self, offset)
-  next(self.Border, self.__offset == offset and self.Border.Show or self.Border.Hide)
+  next(self.Border, self.offset == offset and self.Border.Show or self.Border.Hide)
 end
 addon.REF("OnStanceButtonUpdate", OnStanceButtonUpdate)
 
 local function OnStanceButtonClick(self)
   local current = dbRead(nil, "offset")
-  local offset = self.__offset ~= current and self.__offset or nil
+  local offset = self.offset ~= current and self.offset or nil
   dbWrite(nil, "offset", offset)
   dispatch("OFFSET_CHANGED", offset)
 end
@@ -31,7 +31,7 @@ local function OnSpecializationChanged(self)
       end
       subscribe("OFFSET_CHANGED", button)
       OnStanceButtonUpdate(button, offset)
-      valid = valid or not offset or offset == button.__offset
+      valid = valid or not offset or offset == button.offset
       prev = button
     else
       button:Hide()
@@ -59,7 +59,7 @@ do
     for _, stance in ipairs(stances) do
       if class == stance.class then
         local button = CreateFrame("button", nil, parent, "ActionButtonTemplate")
-        button.__offset = stance.offset
+        button.offset = stance.offset
         button.icon:SetTexture("Interface/Icons/"..stance.icon)
         button:RegisterForClicks("AnyUp")
         button:SetScript("OnClick", OnStanceButtonClick)
@@ -70,7 +70,10 @@ do
     if #buttons > 0 then
       subscribe("PLAYER_SPECIALIZATION_CHANGED", buttons, OnSpecializationChanged)
     end
+    subscribe("GET_STANCES", buttons)
     unsubscribe("INITIALIZE", stances, true)
   end)
+
+
   addon.REF("stances.INITIALIZE", stances.INITIALIZE)
 end
