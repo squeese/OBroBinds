@@ -8,4 +8,7 @@
 deps/util.funcs.lua
 deps/gui.root.lua
 deps/gui.stance.lua
+deps/gui.keyboard.lua
+deps/gui.dev.lua
+deps/layouts.lua
 OBroBinds.lua

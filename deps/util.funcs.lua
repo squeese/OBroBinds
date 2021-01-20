@@ -43,6 +43,14 @@ local function next(fn, ...)
 end
 addon.next = next
 
+local function spread(tbl, ...)
+  if tbl then
+    return unpack(tbl)
+  end
+  return nil
+end
+addon.spread = spread
+
 local function rpush(tbl, ...)
   for i = 1, select("#", ...) do
     local arg = select(i, ...)
@@ -66,7 +74,7 @@ local function match(val, arg, ...)
   if val == arg then return true end
   return select("#", ...) > 0 and next(val, match, ...) or false
 end
-addon.empty = empty
+addon.match = match
 
 do
   local subscriptions = {}
@@ -157,6 +165,21 @@ end
 addon.read = read
 
 do
+  local class
+  addon.subscribe("VARIABLES_LOADED", function(event, frame, ...)
+    class = select(2, UnitClass("player"))
+    return event:unsub():next(frame, ...)
+  end)
+  function addon.dbWrite(arg1, ...)
+    print("write", arg1, ...)
+    OBroBindsDB = write(OBroBindsDB, (arg1 or class), ...)
+  end
+  function addon.dbRead(arg1, ...)
+    OBroBindsDB = read(OBroBindsDB, (arg1 or class), ...)
+  end
+end
+
+do
   local fns = {}
   local function empty(...)
     while #fns > 0 do
@@ -172,21 +195,23 @@ do
   end
 end
 
-local function updateMainbarBindings(tbl)
-  if tbl then
-    for key in pairs(tbl) do
-      tbl[key] = nil
+do
+  local pAlt, pCtrl, pShift, modifier
+  local function getModifier()
+    local nAlt, nCtrl, nShift = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
+    if not (pAlt == nAlt and pCtrl == nCtrl and pShift == nShift) then
+      pAlt, pCtrl, pShift = nAlt, nCtrl, nShift
+      modifier = (pAlt and "ALT-" or "")..(pCtrl and "CTRL-" or "")..(pShift and "SHIFT-" or "")
     end
+    return modifier
   end
-  for index = 1, 12 do
-    local binding = GetBindingKey("ACTIONBUTTON"..index)
-    if binding then
-      tbl = write(tbl, binding, index)
-    end
-  end
-  return tbl
+  addon.getModifier = getModifier
 end
-addon.updateMainbarBindings = updateMainbarBindings
+
+
+
+
+
 
 for key, val in pairs(addon) do
   addon.REF("addon."..key, val)

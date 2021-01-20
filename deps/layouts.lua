@@ -15,7 +15,7 @@ local function move(self, x, y, s, X, Y, fn, ...)
 end
 
 local function key(self, x, y, s, char, fn, ...)
-  tinsert(self, char)
+  tinsert(self, strupper(char))
   tinsert(self, x)
   tinsert(self, y)
   return next(fn, self, x, y, s, ...)
