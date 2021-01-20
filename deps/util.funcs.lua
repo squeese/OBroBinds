@@ -3,223 +3,193 @@ local tinsert = table.insert
 local tremove = table.remove
 
 do
-  local ref = setmetatable({}, {__mode = 'v'})
-  function addon.REF(name, fn)
-    print("REF", fn, name)
-    tinsert(ref, fn)
+  local funcs = setmetatable({}, {__mode = 'v'})
+  local names = {}
+  local active = {}
+  local clean = {}
+
+  function addon.REF(desc, func)
+    local name = tostring(func)
+    names[name] = desc
+    active[name] = true
+    tinsert(funcs, func)
   end
+
   function addon.REPORT()
-    collectgarbage("collect")
-    print("REPORT BEG", #ref)
-    for key, val in pairs(ref) do
-      print(val, key)
+    print("report")
+    local tmp = {}
+    for name in pairs(active) do
+      tmp[name] = true
     end
-    --print("REPORT END")
+    for _, func in pairs(funcs) do
+      local name = tostring(func)
+      tmp[name] = nil
+      print("active", name, names[name])
+    end
+    for name in pairs(tmp) do
+      tinsert(clean, name)
+    end
+    for _, name in pairs(clean) do
+      print("clean", name, names[name])
+    end
   end
 end
 
-local function next(self, fn, ...)
-  if self and fn then
-  -- if fn then
-    return fn(self, ...)
+local function next(fn, ...)
+  if fn and type(fn) == 'function' then
+    return fn(...)
   end
-  return self
+  return fn, ...
 end
-tinsert(addon, next) -- 1
+addon.next = next
 
--- helper function to push arguments to the beginning of a table, shift i suppose
-local function lpush(self, ...)
+local function rpush(tbl, ...)
   for i = 1, select("#", ...) do
     local arg = select(i, ...)
-    tinsert(self, i, arg)
+    tinsert(tbl, arg)
   end
-  return self
+  return tbl
 end
-tinsert(addon, lpush) -- 2
+addon.rpush = rpush
 
--- helper function to push arguments to the end of a table
-local function rpush(self, ...)
-  for i = 1, select("#", ...) do
-    local arg = select(i, ...)
-    tinsert(self, arg)
+local function empty(tbl, ...)
+  if tbl then
+    for i = 1, #tbl do
+      tbl[i] = nil
+    end
   end
-  return self
+  return ...
 end
-tinsert(addon, rpush) -- 3
+addon.empty = empty
 
--- helper function to clean a table of values
-local function clean(self, tbl, ...)
-  for i = 1, #tbl do
-    tbl[i] = nil
-  end
-  return next(self, ...)
+local function match(val, arg, ...)
+  if val == arg then return true end
+  return select("#", ...) > 0 and next(val, match, ...) or false
 end
-tinsert(addon, clean) -- 4
+addon.empty = empty
 
--- helper function to concat tbl with variadic arguments together and pass it along to next function
-do
-  local __tmp = {}
-  local function rcat(self, tbl, ...)
-    return next(self, clean, rpush(rpush(__tmp, unpack(tbl)), ...), unpack(__tmp))
-  end
-  tinsert(addon, rcat) -- 5
-end
-
--- basic subscription/dispatch event system
--- subscribe(key, table, [handlerfunction])
--- dispatch(key, [...arguments)]
--- unsubscribe(key, table)
-local subscribe, unsubscribe
 do
   local subscriptions = {}
 
-  function subscribe(key, tbl, func)
-    --print("sub", key, tbl, func)
-    if type(tbl) == 'function' then
-      func, tbl = tbl, {}
-      addon.REF("random sub func", func)
-      addon.REF("random sub table", tbl)
-    end
-    tbl[key] = func or tbl[key] or next
+  local function subscribe(key, func)
     if not subscriptions[key] then
       subscriptions[key] = {}
     end
     local subs = subscriptions[key]
     for i = 1, #subs do
-      if tbl == subs[i] then return end
+      if func == subs[i] then return end
     end
-    tinsert(subs, 1, tbl)
+    addon.REF(key, func)
+    tinsert(subs, 1, func)
   end
-  tinsert(addon, subscribe) -- 6
+  addon.subscribe = subscribe
 
-  local function dispatch(key, ...)
-    --print("DISPATCH", key, ...)
+  local function unsubscribe(key, func)
     local subs = subscriptions[key]
     if not subs then return end
-    for i = #subs, 1, -1 do
-      local tbl = subs[i]
-      --print(">>", tbl, tbl[key], ...)
-      next(tbl, tbl[key], ...)
-    end
-  end
-  tinsert(addon, dispatch) -- 7
-
-  function unsubscribe(key, tbl, removefn)
-    local subs = subscriptions[key]
-    if not subs then return end
-    for i = #subs, 1, -1 do
-      if subs[i] == tbl then
+    for i = 1, #subs do
+      if subs[i] == func then
         tremove(subs, i)
-        if removefn then
-          tbl[key] = nil
-        end
         return
       end
     end
   end
-  tinsert(addon, unsubscribe) -- 8
+  addon.unsubscribe = unsubscribe
+
+  local queue = {}
+  local QUEUE = {}
+  QUEUE.__index = QUEUE
+  function QUEUE:unsub()
+    unsubscribe(self.key, self.fn)
+    return self
+  end
+  function QUEUE:next(...)
+    if #self > 0 then
+      self.fn = tremove(self)
+      if type(self.fn) == 'table' then
+        return self.fn[self.key](self.fn, self, ...)
+      end
+      return self.fn(self, ...)
+    end
+    self.fn = nil
+    tinsert(queue, self)
+    return ...
+  end
+
+  local function dispatch(key, ...)
+    local subs = subscriptions[key]
+    if not subs then return end
+    local event = tremove(queue) or setmetatable({}, QUEUE)
+    assert(#event == 0, event.key)
+    assert(event.fn == nil, event.key)
+    event.key = key
+    rpush(event, unpack(subs))
+    return event:next(...)
+  end
+  addon.dispatch = dispatch
 end
 
---[[
+local function write(tbl, key, ...)
+  if not tbl then
+    return write({}, key, ...)
+  elseif type(key) == 'function' then
+    tbl = key(tbl, ...)
+  elseif select("#", ...) > 0 then
+    tbl[key] = write(tbl[key], ...)
+  else
+    return key
+  end
+  if type(tbl) ~= 'table' then
+    return tbl
+  end
+  for _ in pairs(tbl) do
+    return tbl
+  end
+  return nil
+end
+addon.write = write
+
+local function read(tbl, key, ...)
+  if not tbl then return nil end
+  if not key then return tbl end
+  return read(tbl[key], ...)
+end
+addon.read = read
+
 do
-  local function once(key, fn, tbl)
-    subscribe(key, (tbl or {}), function(self, ...)
-      fn(...)
-      unsubscribe(key, self, true)
-    end)
+  local fns = {}
+  local function empty(...)
+    while #fns > 0 do
+      tremove(fns)
+    end
+    return ...
+  end
+  function addon:get(...)
+    for i = 1, select("#", ...) do
+      fns[i] = self[select(i, ...)]
+    end
+    return empty(unpack(fns))
   end
 end
-]]
 
-do
-  -- helper function to write to the OBroBindsDB (savedvariables table)
-  -- last argument is the value to write, and the preceding arguments are the path down the table.
-  --   write("PRIEST", "F2", "enabled", true)
-  -- the results would be:
-  --   OBroBindsDB = { ["PRIEST"] = { ["F2"] = { ["enabled"] = true }}}
-  -- it is safe to write to a table that doesnt exist yet, the tables will be created
-  -- as it traverses along the path, and it will also remove empty tables as it traverses
-  -- back, so if we call
-  --   write("PRIEST", "F2", "enabled", nil)
-  -- with nil as value, the result would be
-  -- OBroBindsDB = nil
-  -- because there would only be empty tables left
-  local function write(tbl, key, ...)
-    if not tbl then
-      return write({}, key, ...)
-    elseif type(key) == 'function' then
-      tbl = key(tbl, ...)
-    elseif select("#", ...) > 0 then
-      tbl[key] = write(tbl[key], ...)
-    else
-      return key
+local function updateMainbarBindings(tbl)
+  if tbl then
+    for key in pairs(tbl) do
+      tbl[key] = nil
     end
-    if type(tbl) ~= 'table' then
-      return tbl
-    end
-    for _ in pairs(tbl) do
-      return tbl
-    end
-    return nil
   end
-  tinsert(addon, write)
-
-  -- helper function to read from the OBroBindsDB (savedvariables table)
-  function read(tbl, key, ...)
-    if not tbl then return nil end
-    if not key then return tbl end
-    return read(tbl[key], ...)
+  for index = 1, 12 do
+    local binding = GetBindingKey("ACTIONBUTTON"..index)
+    if binding then
+      tbl = write(tbl, binding, index)
+    end
   end
-  tinsert(addon, read)
-
-  local class
-  subscribe("INITIALIZE", {}, function(self, ...)
-    class = select(3, ...)
-    unsubscribe("INITIALIZE", self, true)
-  end)
-
-  tinsert(addon, function(arg1, ...)
-    print("dbWrite", arg1, ...)
-    OBroBindsDB = write(OBroBindsDB, (arg1 or class), ...) -- 9
-  end)
-  tinsert(addon, function(arg1, ...)
-    return read(OBroBindsDB, (arg1 or class), ...) -- 10
-  end)
+  return tbl
 end
+addon.updateMainbarBindings = updateMainbarBindings
 
--- helper function to create a binary representation of the pressed modifier keys
--- left to right, 0001, alt, ctrl, shift
--- first bit is always one, since we store the modifer in tables, no modifier pressed
--- would be the value 1, and since lua tables are not zero index, 'lowest' value must be 1
-do
-  --local bbor = bit.bor
-  --local function getModifier()
-    --return bbor(1,
-      --(IsShiftKeyDown() and 2 or 0),
-      --(IsControlKeyDown() and 4 or 0),
-      --(IsAltKeyDown() and 8 or 0))
-  --end
-  local mods = {}
-  local function getModifier()
-    if IsAltKeyDown() then tinsert(mods, "ALT") end
-    if IsControlKeyDown() then tinsert(mods, "CTRL") end
-    if IsShiftKeyDown() then tinsert(mods, "SHIFT") end
-    if #mods == 0 then return nil end
-    local modifier = strjoin("-", unpack(mods))
-    for i = 1, #mods do
-      mods[i] = nil
-    end
-    return modifier
-  end
-  tinsert(addon, getModifier) -- 11
-end
-
-do
-  local function match(val, arg, ...)
-    if val == arg then return true end
-    return select("#", ...) > 0 and next(val, match, ...) or false
-  end
-  tinsert(addon, match)
+for key, val in pairs(addon) do
+  addon.REF("addon."..key, val)
 end
 
 --[[
@@ -235,3 +205,12 @@ do
   end
 end
 ]]
+
+--function clean(tbl, ...)
+  --for i = 1, #tbl do
+    --tbl[i] = nil
+  --end
+  --return next(...)
+--end
+--tinsert(addon, clean) -- 4
+
