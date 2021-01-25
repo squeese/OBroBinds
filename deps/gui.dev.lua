@@ -1,5 +1,5 @@
 local _, addon = ...
-local subscribe, dispatch = addon:get("subscribe", "dispatch")
+local subscribe, dispatch, dbWrite = addon:get("subscribe", "dispatch", "dbWrite")
 
 local prev
 local function panel(frame, text, func)
@@ -18,18 +18,47 @@ end
 
 subscribe("TOGGLE_GUI", function(event, frame)
   panel(frame, "reset", function()
-    print("RESET")
     OBroBindsDB = nil
     ReloadUI()
   end)
-  panel(frame, "import", function()
-    dispatch("IMPORT_BINDS", frame)
-  end)
   panel(frame, "reload", ReloadUI)
+
+  panel(frame, "import", function(self, button)
+    while true do
+      local binding, action, kind, info = dispatch("IMPORT_BINDS", frame)
+      if not kind then break
+      elseif kind == "spell" then
+        local name, _, _, _, _, _, id = GetSpellInfo(info)
+        if id or name == info then
+          print(binding, kind, binding, info, name, id, "ADDED")
+          dbWrite(nil, frame.spec, binding, { kind, id })
+        else
+          print(binding, kind, binding, info, "SKIPPED")
+        end
+
+      elseif kind == "macro" then
+        local name = GetMacroInfo(info)
+        if name == info then
+          print(binding, kind, binding, info, "ADDED")
+          dbWrite(nil, frame.spec, binding, { kind, name })
+        else
+          print(binding, kind, binding, info, "SKIPPED")
+        end
+
+      elseif kind == "item" then
+        print(binding, kind, binding, info)
+      end
+      SetBinding(binding, nil)
+    end
+    print("save")
+    SaveBindings(2)
+  end)
+
   return event:unsub():next(frame)
 end)
 
-subscribe("VARIABLES_LOADED", function(event, ...)
+subscribe("PLAYER_LOGIN", function(event, frame, ...)
   C_Timer.After(1, OBroBinds_Toggle)
-  return event:unsub():next(...)
+  --dbWrite(nil, frame.spec, nil)
+  return event:unsub():next(frame, ...)
 end)

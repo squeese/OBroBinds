@@ -1,34 +1,54 @@
 local _, addon = ...
-local subscribe, dispatch, getModifier = addon:get("subscribe", "dispatch", "getModifier")
+local subscribe, dispatch, getModifier, dbRead = addon:get("subscribe", "dispatch", "getModifier", "dbRead")
 
-subscribe("VARIABLES_LOADED", function(event, frame, ...)
-  print(event.key, "frame.class")
-  print(event.key, "frame.spec")
+subscribe("PLAYER_LOGIN", function(event, frame)
   frame.class = select(2, UnitClass("player"))
   frame.spec = GetSpecialization()
   frame.offset = 1
-  return event:unsub():next(frame, ...)
+  dispatch("BIND_ACTIONS", frame.spec)
+  return event:unsub():next(frame)
 end)
 
 subscribe("PLAYER_SPECIALIZATION_CHANGED", function(event, frame, ...)
-  print(event.key, "frame.spec")
   frame.spec = GetSpecialization()
+  frame.offset = 1
+  dispatch("BIND_ACTIONS", frame.spec)
   return event:next(frame, ...)
 end)
 
-subscribe("STANCE_OFFSET_CHANGED", function(event, frame, offset)
+subscribe("OFFSET_CHANGED", function(event, frame, offset)
   frame.offset = offset ~= frame.offset and offset or 1
-  print(event.key, "stance.offset", frame.offset)
   return event:next(frame, offset)
 end)
 
+subscribe("BIND_ACTIONS", function(event, spec)
+  local bindings = dbRead(nil, spec)
+  if bindings then
+    for binding, action in pairs(bindings) do
+      dispatch("BIND_ACTION", binding, unpack(action))
+    end
+  end
+  return event:next(spec)
+end)
+
+subscribe("BIND_ACTION", function(event, binding, kind, id)
+  --if kind == "spell" then
+    --local name = GetSpellInfo(id)
+    --SetBindingSpell(binding, name)
+  --elseif kind == "macro" then
+    --SetBindingMacro(binding, id)
+  --elseif kind == "item" then
+    --local name = GetItemInfo(id)
+    --SetBindingItem(binding, name)
+  --end
+  return event:next(spec, kind, id)
+end)
+
 subscribe("TOGGLE_GUI", function(event, frame)
-  print(event.key, "frame.onshow")
-  print(event.key, "frame.onhide")
   frame:Hide()
   frame:SetFrameStrata("DIALOG")
   frame:SetSize(1, 1)
-  frame:SetPoint("CENTER", UIParent, "CENTER", 0, 32)
+  frame:SetPoint("CENTER", UIParent, "CENTER", 0, 270)
   frame:SetBackdrop({
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
     edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
@@ -58,7 +78,6 @@ subscribe("TOGGLE_GUI", function(event, frame)
 end)
 
 subscribe("TOGGLE_GUI", function(event, frame, ...)
-  print(event.key, "root")
   if frame:IsVisible() then
     frame:Hide()
   else
@@ -72,3 +91,4 @@ subscribe("SHOW_GUI", function(event, frame)
   frame.modifier = getModifier()
   return event:next(frame)
 end)
+

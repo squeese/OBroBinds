@@ -2,39 +2,6 @@ local _, addon = ...
 local tinsert = table.insert
 local tremove = table.remove
 
-do
-  local funcs = setmetatable({}, {__mode = 'v'})
-  local names = {}
-  local active = {}
-  local clean = {}
-
-  function addon.REF(desc, func)
-    local name = tostring(func)
-    names[name] = desc
-    active[name] = true
-    tinsert(funcs, func)
-  end
-
-  function addon.REPORT()
-    print("report")
-    local tmp = {}
-    for name in pairs(active) do
-      tmp[name] = true
-    end
-    for _, func in pairs(funcs) do
-      local name = tostring(func)
-      tmp[name] = nil
-      print("active", name, names[name])
-    end
-    for name in pairs(tmp) do
-      tinsert(clean, name)
-    end
-    for _, name in pairs(clean) do
-      print("clean", name, names[name])
-    end
-  end
-end
-
 local function next(fn, ...)
   if fn and type(fn) == 'function' then
     return fn(...)
@@ -87,7 +54,6 @@ do
     for i = 1, #subs do
       if func == subs[i] then return end
     end
-    addon.REF(key, func)
     tinsert(subs, 1, func)
   end
   addon.subscribe = subscribe
@@ -166,16 +132,15 @@ addon.read = read
 
 do
   local class
-  addon.subscribe("VARIABLES_LOADED", function(event, frame, ...)
+  addon.subscribe("PLAYER_LOGIN", function(event, frame, ...)
     class = select(2, UnitClass("player"))
     return event:unsub():next(frame, ...)
   end)
   function addon.dbWrite(arg1, ...)
-    print("write", arg1, ...)
     OBroBindsDB = write(OBroBindsDB, (arg1 or class), ...)
   end
   function addon.dbRead(arg1, ...)
-    OBroBindsDB = read(OBroBindsDB, (arg1 or class), ...)
+    return read(OBroBindsDB, (arg1 or class), ...)
   end
 end
 
@@ -207,35 +172,3 @@ do
   end
   addon.getModifier = getModifier
 end
-
-
-
-
-
-
-for key, val in pairs(addon) do
-  addon.REF("addon."..key, val)
-end
-
---[[
-do
-  local function filter(self, fn, arg1, ...)
-    if not arg1 then return self end
-    return next(fn(arg1) and rpush(self or {}, arg1) or self, filter, fn, ...)
-  end
-  --tinsert(addon, filter) 
-  local function validStances(self, stance, ...)
-    if not stance then return self end
-    return next(stance.class == class and rpush(self or {}, stance) or self, validStances, ...)
-  end
-end
-]]
-
---function clean(tbl, ...)
-  --for i = 1, #tbl do
-    --tbl[i] = nil
-  --end
-  --return next(...)
---end
---tinsert(addon, clean) -- 4
-
