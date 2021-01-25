@@ -89,7 +89,14 @@ do
     tinsert(queue, self)
     return ...
   end
-
+  function QUEUE:stop(...)
+    self.fn = nil
+    for i = #self, 1, -1 do
+      tremove(self, i)
+    end
+    tinsert(queue, self)
+    return ...
+  end
   local function dispatch(key, ...)
     local subs = subscriptions[key]
     if not subs then return end

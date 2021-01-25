@@ -51,8 +51,8 @@ local function layout(size, fn, ...)
 end
 
 addon.DEFAULT_KEYBOARD_LAYOUT = layout(40,
-  col, 1,               keys, 1, 0, "F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 PRINT PAUSE DEL",
-  col, 0,   move, 0, 1, keys, 1, 0, "` 1 2 3 4 5 6 7 8 9 0 - =",
-  col, 1.3, move, 0, 1, keys, 1, 0, "q w e r t y u i o p [ ]",
-  col, 1.6, move, 0, 1, keys, 1, 0, "a s d f g h j k l ; ' \\",
-  col, 1,   move, 0, 1, keys, 1, 0, "\\ z x c v b n m , . /")
+                        keys, 1, 0, "F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12",
+  col, 0,   move, 0, 1, keys, 1, 0, "1 2 3 4 5 6 7 8 9 0 - =",
+  col, 0.3, move, 0, 1, keys, 1, 0, "q w e r t y u i o p [ ]",
+  col, 0.6, move, 0, 1, keys, 1, 0, "a s d f g h j k l ; '",
+  col, 0,   move, 0, 1, keys, 1, 0, "\\ z x c v b n m , . /")

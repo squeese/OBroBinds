@@ -10,10 +10,24 @@ subscribe("PLAYER_LOGIN", function(event, frame)
 end)
 
 subscribe("PLAYER_SPECIALIZATION_CHANGED", function(event, frame, ...)
-  frame.spec = GetSpecialization()
-  frame.offset = 1
-  dispatch("BIND_ACTIONS", frame.spec)
-  return event:next(frame, ...)
+  local spec = GetSpecialization()
+  if spec ~= frame.spec then
+    if frame.spec then
+      local bindings = dbRead(nil, frame.spec)
+      if bindings then
+        for binding in pairs(bindings) do
+          print("remove binding", binding)
+          SetBinding(binding, nil)
+        end
+      end
+    end
+    frame.spec = spec
+    frame.offset = 1
+    dispatch("BIND_ACTIONS", frame.spec)
+    return event:next(frame, ...)
+  end
+  print("stop")
+  return event:stop()
 end)
 
 subscribe("OFFSET_CHANGED", function(event, frame, offset)
@@ -32,15 +46,15 @@ subscribe("BIND_ACTIONS", function(event, spec)
 end)
 
 subscribe("BIND_ACTION", function(event, binding, kind, id)
-  --if kind == "spell" then
-    --local name = GetSpellInfo(id)
-    --SetBindingSpell(binding, name)
-  --elseif kind == "macro" then
-    --SetBindingMacro(binding, id)
-  --elseif kind == "item" then
-    --local name = GetItemInfo(id)
-    --SetBindingItem(binding, name)
-  --end
+  if kind == "spell" then
+    local name = GetSpellInfo(id)
+    SetBindingSpell(binding, name)
+  elseif kind == "macro" then
+    SetBindingMacro(binding, id)
+  elseif kind == "item" then
+    local name = GetItemInfo(id)
+    SetBindingItem(binding, name)
+  end
   return event:next(spec, kind, id)
 end)
 
@@ -51,11 +65,13 @@ subscribe("TOGGLE_GUI", function(event, frame)
   frame:SetPoint("CENTER", UIParent, "CENTER", 0, 270)
   frame:SetBackdrop({
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
-    edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
+    --edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
+    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
     tile = true,
-    tileSize = 32,
-    edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    tileSize = 16, -- 32,
+    edgeSize = 16, -- 32,
+    --insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    insets = { left = 4, right = 4, top = 4, bottom = 4 }
   })
   frame:SetScript("OnShow", function(self)
     dispatch("SHOW_GUI", self)

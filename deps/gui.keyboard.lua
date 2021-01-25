@@ -1,26 +1,110 @@
 local _, addon = ...
 local subscribe, dispatch, unsubscribe, dbWrite, dbRead, spread = addon:get("subscribe", "dispatch", "unsubscribe", "dbWrite", "dbRead", "spread")
-local index, buttons, mainbar
+local index, buttons, mainbar, current, OnDragStart, OnReceiveDrag
 
-local function UpdateButton(self, frame)
+local function OnEnterSlotTooltip(self)
+  if not self:IsVisible() then return end
+  GameTooltip:SetOwner(self, 'ANCHOR_BOTTOMRIGHT')
+  GameTooltip:SetAction(self.id)
+  current = self
+end
+
+local function OnEnterSpellTooltip(self)
+  if not self:IsVisible() then return end
+  GameTooltip:SetOwner(self, 'ANCHOR_BOTTOMRIGHT')
+  GameTooltip:SetSpellByID(self.id)
+  current = self
+end
+
+local function OnEnterMacroTooltip(self)
+  if not self:IsVisible() then return end
+  GameTooltip:SetOwner(self, 'ANCHOR_BOTTOMRIGHT')
+  GameTooltip:SetText(self.id)
+  current = self
+end
+
+local function OnEnterItemTooltip(self)
+  if not self:IsVisible() then return end
+  GameTooltip:SetOwner(self, 'ANCHOR_BOTTOMRIGHT')
+  local _, _, _, level = GetItemInfo(self.id)
+  GameTooltip:SetItemKey(self.id, level, 0)
+  current = self
+end
+
+local function OnEnterOtherTooltip(self)
+  if not self:IsVisible() then return end
+  GameTooltip:SetOwner(self, 'ANCHOR_BOTTOMRIGHT')
+  GameTooltip:SetText(GetBindingAction(self.id))
+  current = self
+end
+
+local function OnLeaveTooltip(self)
+  GameTooltip:Hide()
+  current = nil
+end
+
+local function UpdateButton(self, frame, inCombat)
   local binding, kind, id = frame.modifier..self.key
   if mainbar[binding] then
-    kind, id = GetActionInfo(mainbar[binding] + frame.offset - 1)
+    local slot = mainbar[binding] + frame.offset - 1
+    kind, id = GetActionInfo(slot)
     self.Border:Show()
     self.Name:SetText(mainbar[binding])
+    self.id = slot
+    self:SetScript("OnEnter", OnEnterSlotTooltip)
+    if kind == 'spell' then
+      self.icon:SetTexture(select(3, GetSpellInfo(id)))
+    elseif kind == 'macro' then
+      self.icon:SetTexture(select(2, GetMacroInfo(id)))
+    elseif kind == 'item' then
+      self.icon:SetTexture(select(10, GetItemInfo(id)))
+    else
+      self.icon:SetTexture(nil)
+    end
   else
     kind, id = spread(dbRead(nil, frame.spec, binding))
     self.Border:Hide()
     self.Name:SetText()
+    self.id = id
+    if kind == 'spell' then
+      self.icon:SetTexture(select(3, GetSpellInfo(id)))
+      self.icon:SetAlpha(1)
+      self:SetScript("OnEnter", OnEnterSpellTooltip)
+    elseif kind == 'macro' then
+      self.icon:SetTexture(select(2, GetMacroInfo(id)))
+      self.icon:SetAlpha(1)
+      self:SetScript("OnEnter", OnEnterMacroTooltip)
+    elseif kind == 'item' then
+      self.icon:SetTexture(select(10, GetItemInfo(id)))
+      self.icon:SetAlpha(1)
+      self:SetScript("OnEnter", OnEnterItemTooltip)
+    elseif GetBindingAction(binding) ~= "" then
+      --self.icon:SetTexture(773178)
+      self.icon:SetTexture(136006)
+      self.icon:SetAlpha(0.5)
+      self.id = binding
+      self:SetScript("OnEnter", OnEnterOtherTooltip)
+    else
+      self.icon:SetTexture(nil)
+      self.icon:SetAlpha(0.5)
+      self.icon:SetColorTexture(0, 0, 0)
+      self:SetScript("OnEnter", nil)
+    end
   end
-  if kind == 'spell' then
-    self.icon:SetTexture(select(3, GetSpellInfo(id)))
-  elseif kind == 'macro' then
-    self.icon:SetTexture(select(2, GetMacroInfo(id)))
-  elseif kind == 'item' then
-    self.icon:SetTexture(select(10, GetItemInfo(id)))
+  if not inCombat then
+    self:SetScript("OnDragStart", OnDragStart)
+    self:SetScript("OnReceiveDrag", OnReceiveDrag)
+    self:SetScript("OnClick", OnReceiveDrag)
+    self:RegisterForDrag("LeftButton")
+    self:RegisterForClicks("AnyUp")
+    self:SetAlpha(1.0)
   else
-    self.icon:SetTexture(nil)
+    self:SetScript("OnDragStart", nil)
+    self:SetScript("OnReceiveDrag", nil)
+    self:SetScript("OnClick", nil)
+    self:RegisterForDrag(nil)
+    self:RegisterForClicks(nil)
+    self:SetAlpha(0.75)
   end
 end
 
@@ -38,23 +122,25 @@ local function PickupBinding(frame, kind, id, name)
     PickupMacro(id)
   elseif kind == "item" then
     PickupItem(id)
+  else
+    return false
   end
+  return true
 end
 
-local function OnDragStart(self)
+function OnDragStart(self)
   local frame = self:GetParent()
   local binding = frame.modifier..self.key
   if mainbar[binding] then
     PickupAction(mainbar[binding] + frame.offset - 1)
-  else
-    PickupBinding(frame, spread(dbRead(nil, frame.spec, binding)))
+  elseif PickupBinding(frame, spread(dbRead(nil, frame.spec, binding))) then
     dbWrite(nil, frame.spec, binding, nil)
     SetBinding(binding, nil)
     UpdateButton(self, frame)
   end
 end
 
-local function OnReceiveDrag(self)
+function OnReceiveDrag(self)
   local frame = self:GetParent()
   local binding = frame.modifier..self.key
   if mainbar[binding] then
@@ -91,18 +177,15 @@ local function UpdateLayout(frame, layout)
     index = index + 1
     if index > #buttons then
       button = CreateFrame("button", nil, frame, "ActionButtonTemplate")
-      button:SetScript("OnDragStart", OnDragStart)
-      button:SetScript("OnReceiveDrag", OnReceiveDrag)
-      button:SetScript("OnClick", OnReceiveDrag)
-      button:RegisterForDrag("LeftButton")
-      button:RegisterForClicks("AnyUp")
+      button:SetScript("OnLeave", OnLeaveTooltip)
+      button.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
       tinsert(buttons, button)
     else
       button = buttons[index]
     end
     local key, x, y = select(i, unpack(layout))
     button.key = key
-    button:SetPoint("TOPLEFT", 16+x, -y-16)
+    button:SetPoint("TOPLEFT", 12+x, -y-12)
     button.Border:Hide()
     button.Border:SetAlpha(1)
     button.HotKey:SetText(key)
@@ -116,12 +199,21 @@ local function UpdateLayout(frame, layout)
     button = buttons[index]
     button:Hide()
   end
-  frame:SetSize(xmax-xmin+16, ymax-ymin+16)
+  frame:SetSize(xmax-xmin+12, ymax-ymin+12)
 end
 
 local function UpdateButtons(event, frame)
+  local inCombat = InCombatLockdown() or event.key == "PLAYER_REGEN_DISABLED"
   for i = 1, index do
-    UpdateButton(buttons[i], frame)
+    UpdateButton(buttons[i], frame, inCombat)
+  end
+  if current then
+    local fn = current:GetScript("OnEnter")
+    if fn then
+      fn(current)
+    else
+      GameTooltip:Hide()
+    end
   end
   return event:next(frame)
 end
@@ -158,8 +250,14 @@ end
 
 subscribe("SHOW_GUI", function(event, frame)
   UpdateLayout(frame, addon.DEFAULT_KEYBOARD_LAYOUT)
+  --for k, v in pairs(GameTooltip) do
+    --if type(v) == 'function' then
+      --print(k)
+    --end
+  --end
   return event:unsub(frame):next(frame)
 end)
+
 
 subscribe("SHOW_GUI", function(event, frame)
   subscribe("UPDATE_BINDINGS", UpdateBindings)
@@ -167,6 +265,8 @@ subscribe("SHOW_GUI", function(event, frame)
   subscribe("OFFSET_CHANGED", UpdateButtons)
   subscribe("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
   subscribe("PLAYER_TALENT_UPDATE", UpdateButtons)
+  subscribe("PLAYER_REGEN_DISABLED", UpdateButtons)
+  subscribe("PLAYER_REGEN_ENABLED", UpdateButtons)
   subscribe("ACTIONBAR_SLOT_CHANGED", ActionBarSlotChanged)
   return UpdateBindings(event, frame)
 end)
@@ -177,10 +277,13 @@ subscribe("HIDE_GUI", function(event, frame)
   unsubscribe("OFFSET_CHANGED", UpdateButtons)
   unsubscribe("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
   unsubscribe("PLAYER_TALENT_UPDATE", UpdateButtons)
-  subscribe("ACTIONBAR_SLOT_CHANGED", ActionBarSlotChanged)
+  unsubscribe("PLAYER_REGEN_DISABLED", UpdateButtons)
+  unsubscribe("PLAYER_REGEN_ENABLED", UpdateButtons)
+  unsubscribe("ACTIONBAR_SLOT_CHANGED", ActionBarSlotChanged)
   return event:next(frame)
 end)
 
+--[[
 do
   local keyRegx = "^(%w+) (.*)$"
   local allMods = {"", "ALT-", "CTRL-", "SHIFT-", "ALT-CTRL-", "ALT-SHIFT-", "ALT-CTRL-SHIFT-", "CTRL-SHIFT-"}
@@ -210,3 +313,4 @@ do
     return event:next(tmp())
   end)
 end
+]]
