@@ -1,5 +1,5 @@
 <Bindings>
-  <Binding name="TOGGLE_CONFIG" header="OBROBINDS" category="ADDONS">
-	OBroBinds_Toggle()
+  <Binding name="Toggle Config Panel" category="OBroBinds">
+    OBroBinds_Toggle()
   </Binding>
 </Bindings>

@@ -1,16 +1,6 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/FrameXML/UI.xsd">
-
   <Script file="deps/util.funcs.lua" />
-  <Script file="deps/gui.parts.lua" />
-  <Script file="deps/layouts.lua" />
-  <!--
-  <Script file="deps/gui.root.lua" />
-  <Script file="deps/gui.stance.lua" />
-  <Script file="deps/gui.keyboard.lua" />
-  <Script file="deps/gui.dev.lua" />
-  -->
-
-  <Frame name="OBroFrameTemplate" movable="true" parent="UIParent" hidden="true" inherits="BackdropTemplate" virtual="true">
+  <Frame name="OBroBindsFrameTemplate" movable="true" parent="UIParent" hidden="true" inherits="BackdropTemplate" virtual="true">
     <Size>
       <AbsDimension x="100" y="100" />
     </Size>
@@ -23,6 +13,12 @@
       <KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
     </KeyValues>
     <Scripts>
+      <OnLoad>
+        BackdropTemplateMixin.OnBackdropLoaded(self)
+        function _G.OBroBinds_Toggle()
+          self:dispatch("GUI_TOGGLE")
+        end
+      </OnLoad>
       <OnShow>
         self:dispatch("GUI_SHOW")
       </OnShow>
@@ -39,11 +35,6 @@
           <Anchor point="TOP" y="24" />
           <Anchor point="RIGHT" x="-24" />
         </Anchors>
-        <!--
-        <KeyValues>
-          <KeyValue key="textString" value="OBroBinds" type="string" />
-        </KeyValues>
-        -->
         <Scripts>
           <OnLoad>
             self.Text:SetText("OBroBinds")
@@ -69,7 +60,10 @@
       </Button>
     </Frames>
   </Frame>
-
+  <!--
+  <Script file="deps/gui.parts.lua" />
+  <Script file="deps/layouts.lua" />
+  -->
   <Script file="OBroBinds.lua" />
 
   <!--

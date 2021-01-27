@@ -2,7 +2,6 @@
 ## Author: OreeBroo - Draenor
 ## Version: 1.0
 ## Title: |cff1784d1OBroBinds|r
-## Notes: Kybinding spells/macro's via GUI
+## Notes: Manage keybindings with a GUI 
 ## SavedVariables: OBroBindsDB
-
 OBroBinds.xml

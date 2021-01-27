@@ -1,20 +1,3 @@
-local _A = select(2, ...)
-local listen, read, write = _A.listen, _A.read, _A.write
-
-local frame = CreateFrame("frame", "OBroBindsFrame", UIParent, "OBroBindsFrameTemplate")
-frame:RegisterEvent("PLAYER_LOGIN")
-
-do
-  local dispatch = _A.dispatch
-  function frame:dispatch(key, ...)
-    return dispatch(key, self, ...)
-  end
-end
-
-listen("PLAYER_LOGIN", function(e, frame)
-  print("ok", frame)
-  return e:once(frame)
-end)
 
 listen("PLAYER_LOGIN", function(e, frame)
   frame.offset = 1
