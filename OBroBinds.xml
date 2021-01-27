@@ -1,0 +1,102 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/FrameXML/UI.xsd">
+
+  <Script file="deps/util.funcs.lua" />
+  <Script file="deps/gui.parts.lua" />
+  <Script file="deps/layouts.lua" />
+  <!--
+  <Script file="deps/gui.root.lua" />
+  <Script file="deps/gui.stance.lua" />
+  <Script file="deps/gui.keyboard.lua" />
+  <Script file="deps/gui.dev.lua" />
+  -->
+
+  <Frame name="OBroFrameTemplate" parent="UIParent" hidden="true" inherits="BackdropTemplate" virtual="true">
+    <Size>
+      <AbsDimension x="100" y="100" />
+    </Size>
+    <Anchors>
+      <Anchor point="CENTER" />
+    </Anchors>
+    <KeyValues>
+      <KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_16_16_5555" type="global"/>
+      <KeyValue key="backdropColor" value="TOOLTIP_DEFAULT_BACKGROUND_COLOR" type="global"/>
+      <KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
+    </KeyValues>
+    <Scripts>
+      <OnShow>
+        self:dispatch("GUI_SHOW")
+      </OnShow>
+      <OnHide>
+        self:dispatch("GUI_HIDE")
+      </OnHide>
+      <OnEvent>
+        self:dispatch(event, ...)
+      </OnEvent>
+    </Scripts>
+  </Frame>
+
+  <Script file="OBroBinds.lua" />
+
+  <!--
+  <Frame name="OBroTEST" parent="UIParent" inherits="BackdropTemplate">
+    <Size>
+      <AbsDimension x="500" y="300" />
+    </Size>
+    <Anchors>
+      <Anchor point="CENTER" />
+    </Anchors>
+    <KeyValues>
+        <KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_16_16_5555" type="global"/>
+        <KeyValue key="backdropColor" value="TOOLTIP_DEFAULT_BACKGROUND_COLOR" type="global"/>
+        <KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
+    </KeyValues>
+    <Frames>
+      <ScrollFrame parentKey="scroll" inherits="UIPanelScrollFrameTemplate">
+        <Anchors>
+          <Anchor point="TOPLEFT" x="8" y="-8" />
+          <Anchor point="BOTTOMRIGHT" x="-8" y="8" />
+        </Anchors>
+        <ScrollChild>
+          <EditBox parentKey="edit" multiLine="true" letters="255" autoFocus="false" countInvisibleLetters="true">
+            <Size x="500" y="200"/>
+            <Anchors>
+              <Anchor point="TOPLEFT" />
+            </Anchors>
+            <Scripts>
+              <OnLoad>
+                ScrollingEdit_OnCursorChanged(self, 0, 0, 0, 0)
+              </OnLoad>
+              <OnTextChanged>
+                ScrollingEdit_OnTextChanged(self, self:GetParent())
+              </OnTextChanged>
+              <OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
+              <OnUpdate>
+                ScrollingEdit_OnUpdate(self, elapsed, self:GetParent())
+              </OnUpdate>
+              <OnEscapePressed function="EditBox_ClearFocus"/>
+            </Scripts>
+            <FontString inherits="GameFontHighlightSmall"/>
+          </EditBox>
+        </ScrollChild>
+        <Scripts>
+          <OnLoad>
+            self.scrollBarHideable = true
+            ScrollFrame_OnLoad(self)
+          </OnLoad>
+        </Scripts>
+      </ScrollFrame>
+      <Button>
+        <Anchors>
+          <Anchor point="TOPLEFT" x="0" y="0" />
+          <Anchor point="BOTTOMRIGHT" x="0" y="0" />
+        </Anchors>
+        <Scripts>
+          <OnClick>
+            self:GetParent().scroll.edit:SetFocus()
+          </OnClick>
+        </Scripts>
+      </Button>
+    </Frames>
+  </Frame>
+  -->
+</Ui>

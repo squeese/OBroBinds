@@ -1,78 +1,91 @@
 local _, addon = ...
-local subscribe, dispatch, getModifier, dbRead = addon:get("subscribe", "dispatch", "getModifier", "dbRead")
+local subscribe, dispatch, getModifier, dbRead, dbWrite = addon:get("subscribe", "dispatch", "getModifier", "dbRead", "dbWrite")
 
-subscribe("PLAYER_LOGIN", function(event, frame)
+subscribe("PLAYER_LOGIN", function(e, frame)
+  dbWrite('GUI', 'open', true)
   frame.class = select(2, UnitClass("player"))
   frame.spec = GetSpecialization()
   frame.offset = 1
-  dispatch("BIND_ACTIONS", frame.spec)
-  return event:unsub():next(frame)
+  frame.stances = dispatch("GET_CLASS_STANCES", frame)
+
+  frame.stances = {
+    {class = "ROGUE", offset = 73,  icon = 'ability_stealth',            1, 2, 3},
+    {class = "DRUID", offset = 97,  icon = 'ability_racial_bearform',    1, 2, 3, 4},
+    {class = "DRUID", offset = 73,  icon = 'ability_druid_catform',      1, 2, 3, 4},
+    {class = "DRUID", offset = 109, icon = 'spell_nature_forceofnature', 1 }}
+  for index = #frame.stances, 1, -1 do
+    if frame.class ~= stances[index].class then
+      table.remove(frame.stances, index)
+    end
+  end
+  dispatch("SET_OVERRIDE_BINDINGS", frame)
+  return e:unsub():next(frame)
 end)
 
-subscribe("PLAYER_SPECIALIZATION_CHANGED", function(event, frame, ...)
+subscribe("PLAYER_LOGIN", addon:take(""))
+
+
+
+subscribe("PLAYER_SPECIALIZATION_CHANGED", function(e, frame, ...)
   local spec = GetSpecialization()
   if spec ~= frame.spec then
     if frame.spec then
-      local bindings = dbRead(nil, frame.spec)
-      if bindings then
-        for binding in pairs(bindings) do
-          print("remove binding", binding)
-          SetBinding(binding, nil)
-        end
-      end
+      ClearOverrideBindings(frame)
     end
     frame.spec = spec
     frame.offset = 1
-    dispatch("BIND_ACTIONS", frame.spec)
-    return event:next(frame, ...)
+    dispatch("SET_OVERRIDE_BINDINGS", frame)
+    return e:next(frame, ...)
   end
-  print("stop")
-  return event:stop()
+  return e:stop()
 end)
 
-subscribe("OFFSET_CHANGED", function(event, frame, offset)
+subscribe("OFFSET_CHANGED", function(e, frame, offset)
   frame.offset = offset ~= frame.offset and offset or 1
-  return event:next(frame, offset)
+  return e:next(frame, offset)
 end)
 
-subscribe("BIND_ACTIONS", function(event, spec)
-  local bindings = dbRead(nil, spec)
+subscribe("SET_OVERRIDE_BINDINGS", function(e, frame)
+  local bindings = dbRead(nil, frame.spec)
   if bindings then
     for binding, action in pairs(bindings) do
-      dispatch("BIND_ACTION", binding, unpack(action))
+      dispatch("SET_OVERRIDE_BIND", frame, binding, unpack(action))
     end
   end
-  return event:next(spec)
+  return e:next(frame)
 end)
 
-subscribe("BIND_ACTION", function(event, binding, kind, id)
+subscribe("SET_OVERRIDE_BIND", function(e, frame, binding, kind, id)
   if kind == "spell" then
     local name = GetSpellInfo(id)
-    SetBindingSpell(binding, name)
+    SetOverrideBindingSpell(frame, false, binding, name)
+    --print("SPELL", name)
+
   elseif kind == "macro" then
-    SetBindingMacro(binding, id)
+    SetOverrideBindingMacro(frame, false, binding, id)
+    --print("MACRO", id)
+
   elseif kind == "item" then
     local name = GetItemInfo(id)
-    SetBindingItem(binding, name)
+    SetOverrideBindingItem(frame, false, binding, name)
+
   end
-  return event:next(spec, kind, id)
+  return e:next(frame, binding, kind, id)
 end)
 
-subscribe("TOGGLE_GUI", function(event, frame)
+subscribe("TOGGLE_GUI", function(e, frame)
   frame:Hide()
   frame:SetFrameStrata("DIALOG")
   frame:SetSize(1, 1)
-  frame:SetPoint("CENTER", UIParent, "CENTER", 0, 270)
   frame:SetBackdrop({
     bgFile = "Interface/DialogFrame/UI-DialogBox-Background",
-    --edgeFile = "Interface/DialogFrame/UI-DialogBox-Border",
     edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
     tile = true,
     tileSize = 16, -- 32,
     edgeSize = 16, -- 32,
-    --insets = { left = 11, right = 12, top = 12, bottom = 11 }
     insets = { left = 4, right = 4, top = 4, bottom = 4 }
   })
+  frame:SetBackdropBorderColor(0.7, 0.7, 0.7, 0.75)
   frame:SetScript("OnShow", function(self)
     dispatch("SHOW_GUI", self)
   end)
@@ -90,21 +103,40 @@ subscribe("TOGGLE_GUI", function(event, frame)
     end
     elapsed = 0
   end)
-  return event:unsub():next(frame)
+
+  local header = CreateFrame("frame", nil, frame, "DialogHeaderTemplate")
+  header:SetPoint("TOP", 0, 18)
+  header.Text:SetText("OBroBinds")
+  header:RegisterForDrag("LeftButton")
+  header:EnableMouse(true)
+  header:SetScript("OnDragStart", function(self)
+    self:GetParent():StartMoving()
+  end)
+  header:SetScript("OnDragStop", function(self)
+    self:GetParent():StopMovingOrSizing()
+  end)
+
+  return e:unsub():next(frame)
 end)
 
-subscribe("TOGGLE_GUI", function(event, frame, ...)
+subscribe("TOGGLE_GUI", function(e, frame, ...)
   if frame:IsVisible() then
+    dbWrite('GUI', 'open', nil)
     frame:Hide()
   else
+    dbWrite('GUI', 'open', true)
     frame:Show()
   end
-  return event:next(frame, ...)
+  return e:next(frame, ...)
 end)
 
-subscribe("SHOW_GUI", function(event, frame)
+subscribe("SHOW_GUI", function(e, frame)
   frame.offset = 1
   frame.modifier = getModifier()
-  return event:next(frame)
+  return e:next(frame)
 end)
 
+subscribe("SHOW_TOOLTIP", function(e, frame, button)
+  print("showtooltip", button.key)
+  return e:next(frame, button)
+end)

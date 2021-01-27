@@ -1,6 +1,7 @@
 local _, addon = ...
 local subscribe, dispatch, unsubscribe, dbWrite, dbRead, spread = addon:get("subscribe", "dispatch", "unsubscribe", "dbWrite", "dbRead", "spread")
-local index, buttons, mainbar, current, OnDragStart, OnReceiveDrag
+local padding = 12
+local index, buttons, mainbar, current, OnDragStart, OnReceiveDrag, OnClick
 
 local function OnEnterSlotTooltip(self)
   if not self:IsVisible() then return end
@@ -52,6 +53,7 @@ local function UpdateButton(self, frame, inCombat)
     self.Name:SetText(mainbar[binding])
     self.id = slot
     self:SetScript("OnEnter", OnEnterSlotTooltip)
+    self.icon:SetAlpha(1)
     if kind == 'spell' then
       self.icon:SetTexture(select(3, GetSpellInfo(id)))
     elseif kind == 'macro' then
@@ -78,6 +80,11 @@ local function UpdateButton(self, frame, inCombat)
       self.icon:SetTexture(select(10, GetItemInfo(id)))
       self.icon:SetAlpha(1)
       self:SetScript("OnEnter", OnEnterItemTooltip)
+    elseif kind == 'blob' then
+      self.icon:SetTexture(441148)
+      self.icon:SetAlpha(1)
+      self:SetScript("OnEnter", nil)
+
     elseif GetBindingAction(binding) ~= "" then
       --self.icon:SetTexture(773178)
       self.icon:SetTexture(136006)
@@ -94,7 +101,7 @@ local function UpdateButton(self, frame, inCombat)
   if not inCombat then
     self:SetScript("OnDragStart", OnDragStart)
     self:SetScript("OnReceiveDrag", OnReceiveDrag)
-    self:SetScript("OnClick", OnReceiveDrag)
+    self:SetScript("OnClick", OnClick)
     self:RegisterForDrag("LeftButton")
     self:RegisterForClicks("AnyUp")
     self:SetAlpha(1.0)
@@ -135,12 +142,12 @@ function OnDragStart(self)
     PickupAction(mainbar[binding] + frame.offset - 1)
   elseif PickupBinding(frame, spread(dbRead(nil, frame.spec, binding))) then
     dbWrite(nil, frame.spec, binding, nil)
-    SetBinding(binding, nil)
+    --SetBinding(binding, nil)
     UpdateButton(self, frame)
   end
 end
 
-function OnReceiveDrag(self)
+function OnReceiveDrag(self, button)
   local frame = self:GetParent()
   local binding = frame.modifier..self.key
   if mainbar[binding] then
@@ -162,9 +169,25 @@ function OnReceiveDrag(self)
       ClearCursor()
       PickupBinding(frame, spread(dbRead(nil, frame.spec, binding)))
       dbWrite(nil, frame.spec, binding, action)
-      dispatch("BIND_ACTION", binding, unpack(action))
+      dispatch("SET_OVERRIDE_BIND", frame, binding, unpack(action))
       UpdateButton(self, frame)
     end
+  end
+end
+
+function OnClick(self, button)
+  if button == 'RightButton' then
+    local frame = self:GetParent()
+    local binding = frame.modifier..self.key
+    if not mainbar[binding] then
+      dispatch("SHOW_DROPDOWN", self)
+    end
+    --local binding = self:GetParent().modifier..self.key
+    --print("delete binding", binding)
+    --SetBinding(binding, nil)
+    --SaveBindings(2)
+  else
+    OnReceiveDrag(self)
   end
 end
 
@@ -185,7 +208,7 @@ local function UpdateLayout(frame, layout)
     end
     local key, x, y = select(i, unpack(layout))
     button.key = key
-    button:SetPoint("TOPLEFT", 12+x, -y-12)
+    button:SetPoint("TOPLEFT", padding+x, -y-padding-12)
     button.Border:Hide()
     button.Border:SetAlpha(1)
     button.HotKey:SetText(key)
@@ -199,14 +222,93 @@ local function UpdateLayout(frame, layout)
     button = buttons[index]
     button:Hide()
   end
-  frame:SetSize(xmax-xmin+12, ymax-ymin+12)
+  frame:SetSize(xmax-xmin+padding, ymax-ymin+padding)
 end
 
+local function toAction(kind, id)
+  if kind == "spell" then
+    return "SPELL "..GetSpellInfo(id)
+  elseif kind == "macro" then
+    return "MACRO "..id
+  elseif kind == "item" then
+    return "ITEM "..GetItemInfo(id)
+  end
+end
+
+local regex = "^(%w+) (.*)$"
+local function toOverride(action)
+  local kind, info = string.match(action, regex)
+  if kind == "SPELL" then
+    local id = select(7, GetSpellInfo(info))
+    if id then
+      return 'spell', id
+    end
+    return nil
+  elseif kind == "MACRO" then
+    if GetMacroInfo(info) == info then
+      return 'macro', info
+    end
+    return nil
+  elseif kind == "ITEM" then
+    return nil
+  end
+  return nil
+end
+
+local function TMP(spec, binding)
+  local action = GetBindingAction(binding, false)
+  --print("scan", binding, action)
+  if action and action ~= "" and action == GetBindingAction(binding, true) then
+    local stored = dbRead(nil, spec, binding)
+    if stored == nil then
+      local key, id = toOverride(action)
+      if key then
+        print("new", binding, action)
+        dbWrite(nil, spec, binding, { key, id })
+        return true
+      end
+    elseif action == toAction(unpack(stored)) then
+      print("reuse", binding, action)
+      return true
+    end
+  end
+  return false
+end
+
+local UpdateBindings
+
 local function UpdateButtons(event, frame)
+  print("UpdateButtons", event.key)
+
+  for i = 1, index do
+    buttons[i].binding = frame.modifier..buttons[i].key
+  end
+
   local inCombat = InCombatLockdown() or event.key == "PLAYER_REGEN_DISABLED"
+  if not inCombat then
+    local arr
+    for i = 1, index do
+      local button = buttons[i]
+      if TMP(frame.spec, button.binding) then
+        arr = arr or {}
+        tinsert(arr, button.binding)
+      end
+    end
+    if arr then
+      unsubscribe("UPDATE_BINDINGS", UpdateBindings)
+      print("NIL =>", unpack(arr))
+      for _, binding in ipairs(arr) do
+        SetBinding(binding, nil)
+      end
+      SaveBindings(2)
+      subscribe("UPDATE_BINDINGS", UpdateBindings)
+    end
+  end
+
   for i = 1, index do
     UpdateButton(buttons[i], frame, inCombat)
   end
+
   if current then
     local fn = current:GetScript("OnEnter")
     if fn then
@@ -218,7 +320,8 @@ local function UpdateButtons(event, frame)
   return event:next(frame)
 end
 
-local function UpdateBindings(event, frame)
+function UpdateBindings(event, frame)
+  print("UpdateBindings", event.key)
   mainbar = mainbar or {}
   for binding in pairs(mainbar) do
     mainbar[binding] = nil
@@ -250,11 +353,6 @@ end
 
 subscribe("SHOW_GUI", function(event, frame)
   UpdateLayout(frame, addon.DEFAULT_KEYBOARD_LAYOUT)
-  --for k, v in pairs(GameTooltip) do
-    --if type(v) == 'function' then
-      --print(k)
-    --end
-  --end
   return event:unsub(frame):next(frame)
 end)
 
@@ -287,30 +385,34 @@ end)
 do
   local keyRegx = "^(%w+) (.*)$"
   local allMods = {"", "ALT-", "CTRL-", "SHIFT-", "ALT-CTRL-", "ALT-SHIFT-", "ALT-CTRL-SHIFT-", "CTRL-SHIFT-"}
-  local function tmp()
+  function TMP_IMPORT(spec)
+    local save = false
     for i = 1, index do
       local button = buttons[i]
       for _, modifier in ipairs(allMods) do
         local binding = modifier..button.key
         local action = GetBindingAction(binding)
         local kind, info = string.match(action, keyRegx)
-
-        if kind == "SPELL" then
-          return binding, action, "spell", info
-
-        elseif kind == "MACRO" then
-          return binding, action, "macro", info
-
-        elseif kind == "ITEM" then
-          return binding, action, "item", info
-
+        if action and action ~= "" and not dbRead(nil, spec, binding) then
+          if kind == "SPELL" then
+            SetBinding(binding, nil)
+            print("?", binding, action, "spell", info)
+            local id = select(7, GetSpellInfo(info))
+            if id then
+              GetSpellInfo(info)
+              dbWrite(nil, spec, binding, {"spell", })
+              save = true
+            end
+          elseif kind == "MACRO" then
+            print("?", binding, action, "macro", info)
+            --save = true
+          elseif kind == "ITEM" then
+            print("?", binding, action, "item", info)
+            --save = true
+          end
         end
       end
     end
   end
-
-  subscribe("IMPORT_BINDS", function(event)
-    return event:next(tmp())
-  end)
 end
 ]]

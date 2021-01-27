@@ -2,6 +2,19 @@ local _, addon = ...
 local tinsert = table.insert
 local tremove = table.remove
 
+do
+  local t = setmetatable({}, {__mode = 'v'})
+  function addon:reg(name, fn)
+    print("reg", name, fn)
+    table.insert(t, fn)
+  end
+  function addon:rep()
+    for k, v in pairs(t) do
+      print("rep", k, v)
+    end
+  end
+end
+
 local function next(fn, ...)
   if fn and type(fn) == 'function' then
     return fn(...)
@@ -137,45 +150,65 @@ local function read(tbl, key, ...)
 end
 addon.read = read
 
-do
-  local class
-  addon.subscribe("PLAYER_LOGIN", function(event, frame, ...)
-    class = select(2, UnitClass("player"))
-    return event:unsub():next(frame, ...)
-  end)
-  function addon.dbWrite(arg1, ...)
-    OBroBindsDB = write(OBroBindsDB, (arg1 or class), ...)
-  end
-  function addon.dbRead(arg1, ...)
-    return read(OBroBindsDB, (arg1 or class), ...)
-  end
-end
+
+
+
+
 
 do
-  local fns = {}
-  local function empty(...)
-    while #fns > 0 do
-      tremove(fns)
+  local SUBS = {}
+  function addon.listen(key, fn)
+    SUBS[key] = SUBS[key] or {}
+    local subs = SUBS[key]
+    for i = 1, #subs do
+      if fn == subs[i] then return end
     end
-    return ...
+    tinsert(subs, 1, fn)
   end
-  function addon:get(...)
-    for i = 1, select("#", ...) do
-      fns[i] = self[select(i, ...)]
+  function addon.release(key, fn)
+    local subs = SUBS[key]
+    if not subs then return end
+    for i = 1, #subs do
+      if subs[i] == fn then
+        return tremove(subs, i)
+      end
     end
-    return empty(unpack(fns))
   end
-end
-
-do
-  local pAlt, pCtrl, pShift, modifier
-  local function getModifier()
-    local nAlt, nCtrl, nShift = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
-    if not (pAlt == nAlt and pCtrl == nCtrl and pShift == nShift) then
-      pAlt, pCtrl, pShift = nAlt, nCtrl, nShift
-      modifier = (pAlt and "ALT-" or "")..(pCtrl and "CTRL-" or "")..(pShift and "SHIFT-" or "")
+  do
+    local Q = {}
+    Q.__index = Q
+    function Q:next(...)
+      if #self > 0 then
+        self.fn = tremove(self)
+        return self.fn(self, ...)
+      end
+      return ...
     end
-    return modifier
+    function Q:release()
+      addon.release(self.key, self.fn)
+      return self
+    end
+    function Q:once(...)
+      addon.release(self.key, self.fn)
+      return self:next(...)
+    end
+    local pool = {}
+    local function release(q, ...)
+      for key in pairs(q) do
+        q[key] = nil
+      end
+      tinsert(pool, q)
+      return ...
+    end
+    function addon.dispatch(key, ...)
+      local subs = SUBS[key]
+      if not subs then return end
+      local q = tremove(pool) or setmetatable({}, Q)
+      q.key = key
+      for i = 1, #subs do
+        q[i] = subs[i]
+      end
+      return release(q, q:next(...))
+    end
   end
-  addon.getModifier = getModifier
 end
