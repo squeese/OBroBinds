@@ -10,7 +10,7 @@
   <Script file="deps/gui.dev.lua" />
   -->
 
-  <Frame name="OBroFrameTemplate" parent="UIParent" hidden="true" inherits="BackdropTemplate" virtual="true">
+  <Frame name="OBroFrameTemplate" movable="true" parent="UIParent" hidden="true" inherits="BackdropTemplate" virtual="true">
     <Size>
       <AbsDimension x="100" y="100" />
     </Size>
@@ -33,6 +33,41 @@
         self:dispatch(event, ...)
       </OnEvent>
     </Scripts>
+    <Frames>
+      <Frame enableMouse="true" inherits="DialogHeaderTemplate">
+        <Anchors>
+          <Anchor point="TOP" y="24" />
+          <Anchor point="RIGHT" x="-24" />
+        </Anchors>
+        <!--
+        <KeyValues>
+          <KeyValue key="textString" value="OBroBinds" type="string" />
+        </KeyValues>
+        -->
+        <Scripts>
+          <OnLoad>
+            self.Text:SetText("OBroBinds")
+            self:RegisterForDrag("LeftButton")
+          </OnLoad>
+          <OnDragStart>
+            self:GetParent():StartMoving()
+          </OnDragStart>
+          <OnDragStop>
+            self:GetParent():StopMovingOrSizing()
+          </OnDragStop>
+        </Scripts>
+      </Frame>
+      <Button inherits="UIPanelCloseButtonNoScripts">
+        <Anchors>
+          <Anchor point="TOPRIGHT" x="0" y="20" />
+        </Anchors>
+        <Scripts>
+          <OnClick>
+            OBroBinds_Toggle()
+          </OnClick>
+        </Scripts>
+      </Button>
+    </Frames>
   </Frame>
 
   <Script file="OBroBinds.lua" />

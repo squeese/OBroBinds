@@ -1,5 +1,5 @@
 local _, ADDON = ...
-local listen, release, match, rpush = ADDON.listen, ADDON.release, ADDON.match, ADDON.rpush
+local listen, release, match, rpush, read = ADDON.listen, ADDON.release, ADDON.match, ADDON.rpush, ADDON.read
 
 function ADDON:part(name)
   local value = self[name]
@@ -46,7 +46,7 @@ do
         button:Show()
         button:ClearAllPoints()
         if not prev then
-          button:SetPoint("TOPLEFT", 16, 34)
+          button:SetPoint("LEFT", frame, "TOPLEFT", 12, 4)
         else
           button:SetPoint("LEFT", prev, "RIGHT", 4, 0)
         end
@@ -66,16 +66,6 @@ do
     frame.offset = offset ~= frame.offset and offset or 1
     return UpdateButtons(e, frame)
   end
-  local function SetupListeners(e, frame)
-    listen("OFFSET_CHANGED", UpdateOffset)
-    listen("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
-    return UpdateOffset(e, frame, frame.offset)
-  end
-  local function RemoveListeners(e, frame)
-    release("OFFSET_CHANGED", UpdateOffset)
-    release("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
-    return e:next(frame)
-  end
   local function OnClick(self)
     self:GetParent():dispatch("OFFSET_CHANGED", self.offset)
   end
@@ -86,6 +76,16 @@ do
     button:RegisterForClicks("AnyUp")
     button:SetScript("OnClick", OnClick)
     return rpush(button, ...)
+  end
+  local function SetupListeners(e, frame)
+    listen("OFFSET_CHANGED", UpdateOffset)
+    listen("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
+    return UpdateOffset(e, frame, frame.offset)
+  end
+  local function RemoveListeners(e, frame)
+    release("OFFSET_CHANGED", UpdateOffset)
+    release("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
+    return e:next(frame)
   end
   function ADDON.InitializeStanceHandler(e, frame)
     frame.offset = 1
@@ -101,6 +101,38 @@ do
     else
       return e:once(frame)
     end
+    listen("GUI_HIDE", RemoveListeners)
+    listen("GUI_SHOW", SetupListeners)
+    return SetupListeners(e:release(), frame)
+  end
+end
+
+----------------------------------------------------- Find missing icons for spells
+do
+  local KIND, ID, NAME, ICON = 1, 2, 3, 4
+  local function Update(e, frame)
+    local overrides = read(OBroBindsDB, frame.class, frame.spec)
+    if overrides then
+      for binding, action in pairs(overrides) do
+        if not action[ID] then
+          local icon, _, _, _, id = select(3, GetSpellInfo(action[NAME]))
+          action[ID], action[ICON] = id, icon or action[ICON]
+        end
+      end
+    end
+    return e:next(frame)
+  end
+  local function SetupListeners(e, frame)
+    listen("PLAYER_SPECIALIZATION_CHANGED", Update)
+    listen("PLAYER_TALENT_UPDATE", Update)
+    return e:next(frame)
+  end
+  local function RemoveListeners(e, frame)
+    release("PLAYER_SPECIALIZATION_CHANGED", Update)
+    release("PLAYER_TALENT_UPDATE", Update)
+    return e:next(frame)
+  end
+  function ADDON.InitializeMissingIconHandler(e, frame)
     listen("GUI_HIDE", RemoveListeners)
     listen("GUI_SHOW", SetupListeners)
     return SetupListeners(e:release(), frame)
@@ -125,105 +157,72 @@ do
   end
 
   local function UpdateOverrideButton(self, frame, binding)
-    local kind, id = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
+    local kind, id, name, icon, locked = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
     self.Border:Hide()
     self.Name:SetText()
-    if kind == 'spell' then
-      self.icon:SetTexture(select(3, GetSpellInfo(id)))
-    elseif kind == 'macro' then
-      self.icon:SetTexture(select(2, GetMacroInfo(id)))
-    elseif kind == 'item' then
-      self.icon:SetTexture(select(10, GetItemInfo(id)))
+    local hasBinding = GetBindingAction(binding, false) ~= ""
+    self.icon:SetVertexColor(1, 1, 1, 1)
+    if kind == 'SPELL' then
+      self.icon:SetTexture(select(3, GetSpellInfo(id)) or icon)
+    elseif kind == 'MACRO' then
+      self.icon:SetTexture(select(2, GetMacroInfo(name)) or icon)
+    elseif kind == 'ITEM' then
+      self.icon:SetTexture(select(10, GetItemInfo(id or 0)) or icon)
     elseif kind == 'blob' then
       self.icon:SetTexture(441148)
-    --elseif GetBindingAction(binding) ~= "" then
-      --self.icon:SetTexture(136006)
+    elseif hasBinding then
+      self.icon:SetTexture(136243)
+      self.icon:SetVertexColor(0.8, 1, 0.1, 0.1)
     else
       self.icon:SetTexture(nil)
     end
-    if GetBindingAction(binding, false) ~= "" then
+    if hasBinding then
       self.AutoCastable:Show()
     else
       self.AutoCastable:Hide()
+    end
+    if locked then
+      self.LevelLinkLockIcon:Show()
+    else
+      self.LevelLinkLockIcon:Hide()
+    end
+  end
+
+  local function Update(self)
+    frame = frame or self:GetParent()
+    local binding = frame.modifier..self.key
+    if frame.mainbar[binding] then
+      local slot = frame.mainbar[binding] + frame.offset - 1
+      frame.mainbar[slot] = self
+      UpdateMainbarButton(self, frame, binding, slot)
+    else
+      UpdateOverrideButton(self, frame, binding)
     end
   end
 
   local function UpdateButtons(e, frame)
     print("UpdateButtons", e.key)
     for index = 1, frame.index do
-      local button = frame.buttons[index]
-      local binding = frame.modifier..button.key
-      if frame.mainbar[binding] then
-        local slot = frame.mainbar[binding] + frame.offset - 1
-        frame.mainbar[slot] = button
-        UpdateMainbarButton(button, frame, binding, slot)
-      else
-        UpdateOverrideButton(button, frame, binding)
-      end
+      frame.buttons[index]:Update(frame)
     end
     return e:next(frame)
   end
 
-  local UpdateBindings
-  do
-    --local pattern = "^(%w+) (.*)$"
-    --local function actionToOverride(action)
-      --local kind, info = string.match(action, pattern)
-      --if kind == "SPELL" then
-        --local id = select(7, GetSpellInfo(info))
-        --if id then
-          --return 'spell', id
-        --end
-      --elseif kind == "MACRO" then
-        --if GetMacroInfo(info) == info then
-          --return 'macro', info
-        --end
-      --elseif kind == "ITEM" then
-        --local name, link = GetItemInfo(info)
-        --local id = select(4, string.find(link, "^|c%x+|H(%a+):(%d+)[|:]"))
-        --if name == info and id ~= nil then
-          --return 'item', id
-        --end
-      --end
-      --return nil
-    --end
-    --local modifiers = {"", "ALT-", "CTRL-", "SHIFT-", "ALT-CTRL-", "ALT-SHIFT-", "ALT-CTRL-SHIFT-", "CTRL-SHIFT-"}
-    function UpdateBindings(e, frame)
-      print("UpdateBindings", e.key, frame.mainbar)
-      --for index = 1, frame.index do
-        --local button = frame.buttons[index]
-        --for _, modifier in ipairs(modifiers) do
-          --local binding = modifier..button.key
-          --local action = GetBindingAction(binding, false)
-          --if action and action ~= "" then
-            --local kind, id = actionToOverride(action)
-            --if kind then
-              --local dbKind, dbId = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
-              --if not dbKind or (kind == dbKind and id == dbId) then
-                --print("import", kind, id)
-                --frame:UnregisterEvent("UPDATE_BINDINGS")
-                --SetBinding(binding, nil)
-                --SaveBindings(GetCurrentBindingSet())
-                --frame:RegisterEvent("UPDATE_BINDINGS")
-                --frame:dispatch("SET_OVERRIDE_BINDING", binding, kind, id)
-              --end
-            --end
-          --end
-        --end
-      --end
-      for key in pairs(frame.mainbar) do
-        frame.mainbar[key] = nil
-      end
-      for index = 1, 12 do
-        local binding = GetBindingKey("ACTIONBUTTON"..index)
-        if binding then
-          frame.mainbar[binding] = index
-          frame:dispatch("DB_DEL_OVERRIDE", binding)
-        end
-      end
-      return UpdateButtons(e, frame)
+  local function UpdateBindings(e, frame)
+    print("UpdateBindings", e.key, frame.mainbar)
+    for key in pairs(frame.mainbar) do
+      frame.mainbar[key] = nil
     end
+    for index = 1, 12 do
+      local binding = GetBindingKey("ACTIONBUTTON"..index)
+      if binding then
+        frame.mainbar[binding] = index
+        frame:dispatch("DB_DEL_OVERRIDE", binding)
+      end
+    end
+    return UpdateButtons(e, frame)
   end
+
   local function ActionBarSlotChanged(e, frame, slot)
     if frame.mainbar[slot] then
       local button = frame.mainbar[slot]
@@ -236,6 +235,7 @@ do
   end
   local function SetupListeners(e, frame)
     listen("UPDATE_BINDINGS", UpdateBindings)
+    listen("UPDATE_MACROS", UpdateButtons)
     listen("OFFSET_CHANGED", UpdateButtons)
     listen("MODIFIER_CHANGED", UpdateButtons)
     listen("PLAYER_TALENT_UPDATE", UpdateButtons)
@@ -245,6 +245,7 @@ do
   end
   local function RemoveListeners(e, frame)
     release("UPDATE_BINDINGS", UpdateBindings)
+    release("UPDATE_MACROS", UpdateButtons)
     release("OFFSET_CHANGED", UpdateButtons)
     release("MODIFIER_CHANGED", UpdateButtons)
     release("PLAYER_TALENT_UPDATE", UpdateButtons)
@@ -261,18 +262,25 @@ do
   local function OnClick(self, button)
     if InCombatLockdown() then return end
     if button == "RightButton" then
-      self:GetParent():dispatch("SHOW_DROPDOWN", self)
+      local frame = self:GetParent()
+      local binding = frame.modifier..self.key
+      if not frame.mainbar[binding] then
+        frame:dispatch("SHOW_DROPDOWN", self)
+      end
     elseif GetCursorInfo() then
       self:GetParent():dispatch("RECEIVE_BINDING", self)
+      self:Update()
     end
   end
   local function OnDragStart(self)
     if InCombatLockdown() then return end
     self:GetParent():dispatch("PICKUP_BINDING", self)
+    self:Update()
   end
   local function OnReceiveDrag(self)
     if InCombatLockdown() then return end
     self:GetParent():dispatch("RECEIVE_BINDING", self)
+    self:Update()
   end
   function ADDON.InitializeButtonHandler(e, frame)
     -- TODO: cleanup
@@ -297,6 +305,7 @@ do
         button:RegisterForClicks("AnyUp")
         button.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
         --button.notice = button:CreateTexture(nil, )
+        button.Update = Update
         table.insert(frame.buttons, button)
       else
         button = frame.buttons[frame.index]
@@ -308,8 +317,13 @@ do
       button.Border:SetAlpha(1)
       button.HotKey:SetText(key)
       button.Name:SetText()
+      --button.AutoCastable:SetTexCoord(0, 0.5, 0.5, 1)
+      button.AutoCastable:SetTexCoord(0.15, 0.6, 0.6, 0.15)
+      button.AutoCastable:ClearAllPoints()
+      button.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
+      button.AutoCastable:SetScale(0.4)
+      button.AutoCastable:SetAlpha(0.75)
       --button.LevelLinkLockIcon:Show()
-      --button.AutoCastable:Show()
       --button.SpellHighlightTexture:Show()
       --button.NewActionTexture:Show()
       xmin = math.min(xmin, button:GetLeft())
@@ -338,18 +352,26 @@ do
       GameTooltip:SetAction(frame.mainbar[binding] + frame.offset - 1)
       return
     end
-    local kind, id = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
-    if kind == 'spell' then
-      GameTooltip:SetSpellByID(id)
-    elseif kind == 'macro' then
-      GameTooltip:SetText("MACRO: "..id)
-    elseif kind == 'item' then
-      local _, _, _, level = GetItemInfo(id)
-      GameTooltip:SetItemKey(id, level, 0)
+    local kind, id, name = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
+    if kind == 'SPELL' then
+      if id and GetSpellInfo(id) then
+        GameTooltip:SetSpellByID(id)
+      else
+        GameTooltip:SetText("SPELL "..name)
+      end
+    elseif kind == 'MACRO' then
+      GameTooltip:SetText("MACRO "..name)
+    elseif kind == 'ITEM' then
+      local level = select(4, GetItemInfo(id or 0))
+      if id and level then
+        GameTooltip:SetItemKey(id, level, 0)
+      else
+        GameTooltip:SetText("ITEM "..name)
+      end
     elseif kind == 'blob' then
-      GameTooltip:SetText("BLOB: "..id)
-    elseif GetBindingAction(binding) ~= "" then
-      GameTooltip:SetText(GetBindingAction(binding))
+      GameTooltip:SetText("BLOB "..id)
+    elseif GetBindingAction(binding, false) ~= "" then
+      GameTooltip:SetText(GetBindingAction(binding, false))
     else
       GameTooltip:Hide()
     end
@@ -396,10 +418,42 @@ end
 
 
 do
+  local function actionPromotable(action, oKind, id)
+    local kind, info = string.match(action, "^(%w+) (.*)$")
+    if kind == 'SPELL' then return true end
+    if kind == 'MACRO' then return true end
+    if kind == 'ITEM' then return true end
+    --if kind == 'SPELL' and (oKind == nil or (oKind == kind and info ~= GetSpellInfo(info))) then
+      --return true
+    --end
+  end
+
   local info, dropdown
+  local function RemoveOverride(self, button, binding)
+    button:GetParent():dispatch("DEL_OVERRIDE_BINDING", true, binding)
+    button:Update()
+    CloseDropDownMenus()
+  end
+  local function RemoveBinding(self, _, binding)
+    SetBinding(binding, nil)
+    SaveBindings(GetCurrentBindingSet())
+    CloseDropDownMenus()
+  end
+  local function PromoteBinding(self, button, binding)
+    button:GetParent():dispatch("PROMOTE_BINDING", binding)
+    SetBinding(binding, nil)
+    SaveBindings(GetCurrentBindingSet())
+    CloseDropDownMenus()
+  end
+  local function LockBinding(self, button, binding)
+    button:GetParent():dispatch("LOCK_BINDING", binding)
+    button:Update()
+    CloseDropDownMenus()
+  end
+
   local function UpdateDropdown(e, frame, button)
     info.arg1 = button
-    ToggleDropDownMenu(1, nil, dropdown, "cursor", 0, 0)
+    ToggleDropDownMenu(1, nil, dropdown, "cursor", 0, 0, "root")
     return e:next(frame, button)
   end
   local function SetupListeners(e, frame)
@@ -414,20 +468,105 @@ do
     info = UIDropDownMenu_CreateInfo()
     dropdown = CreateFrame("frame", nil, UIParent, "UIDropDownMenuTemplate")
     dropdown.displayMode = "MENU"
-    function dropdown:initialize()
+    function dropdown:initialize(_, section)
       local binding = frame.modifier..info.arg1.key
       info.arg2 = binding
 
-      info.text = binding
-      info.isTitle = true
-      info.notCheckable = true
-      UIDropDownMenu_AddButton(info)
-      --UIDropDownMenu_AddSpace()
-      UIDropDownMenu_AddSeparator(1)
-      UIDropDownMenu_AddButton(info)
-      -- remove override
-      -- remove binding
-      -- create macro
+      if section == "root" then
+        info.text = "Override"
+        info.hasArrow = false
+        info.menuList = nil
+        info.isTitle = true
+        info.disabled = true
+        info.notCheckable = true
+        UIDropDownMenu_AddButton(info, 1)
+
+        local kind, id, name, _, locked = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
+        if not kind then
+          info.text = 'none'
+        else
+          info.text = kind.." "..name
+        end
+        info.hasArrow = not locked
+        info.menuList = "override"
+        info.isTitle = false
+        info.disabled = locked
+        info.notCheckable = true
+        info.checked = false
+        UIDropDownMenu_AddButton(info, 1)
+        UIDropDownMenu_AddSeparator(1)
+
+        info.text = "Binding"
+        info.hasArrow = false
+        info.menuList = nil
+        info.isTitle = true
+        info.disabled = true
+        info.notCheckable = true
+        info.checked = false
+        UIDropDownMenu_AddButton(info)
+
+        local action = GetBindingAction(binding, false)
+        info.text = action == "" and "none" or action
+        info.hasArrow = not locked and action ~= ""
+        info.menuList = "binding"
+        info.isTitle = false
+        info.disabled = locked or action == ""
+        info.notCheckable = true
+        info.checked = false
+        UIDropDownMenu_AddButton(info, 1)
+
+        info.text = locked and "Unock" or "Lock"
+        info.hasArrow = false
+        info.menuList = nil
+        info.isTitle = false
+        info.disabled = false
+        info.func = LockBinding
+        info.notCheckable = false
+        info.checked = locked
+        UIDropDownMenu_AddButton(info, 1)
+
+      elseif section == "override" then
+        info.hasArrow = false
+        info.menuList = nil
+        info.isTitle = false
+        info.disabled = false
+        info.notCheckable = true
+        info.checked = false
+
+        local kind = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
+        if kind == 'blob' then
+          info.text = "Edit blob"
+          info.func = EditBlob
+          UIDropDownMenu_AddButton(info, 2)
+        end
+        if kind then
+          info.text = "Clear override"
+          info.func = RemoveOverride
+          UIDropDownMenu_AddButton(info, 2)
+        end
+        if not kind then
+          info.text = "Create blob"
+          info.func = CreateBlob
+          UIDropDownMenu_AddButton(info, 2)
+        end
+
+      elseif section == "binding" then
+        info.hasArrow = false
+        info.menuList = nil
+        info.isTitle = false
+        info.disabled = false
+
+        local action = GetBindingAction(binding, false)
+        if actionPromotable(action, select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))) then
+          info.text = "Promote to override"
+          info.func = PromoteBinding
+          UIDropDownMenu_AddButton(info, 2)
+        end
+
+        info.text = "Clear binding"
+        info.func = RemoveBinding
+        UIDropDownMenu_AddButton(info, 2)
+      end
     end
     listen("GUI_HIDE", RemoveListeners)
     listen("GUI_SHOW", SetupListeners)
