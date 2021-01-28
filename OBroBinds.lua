@@ -1,31 +1,19 @@
 local _A = select(2, ...)
-local listen, read, write = _A.listen, _A.read, _A.write
-
+local listen, release, map, read, write, push = _A.listen, _A.release, _A.map, _A.read, _A.write, _A.push
 local frame = CreateFrame("frame", "OBroBindsFrame", UIParent, "OBroBindsFrameTemplate")
+frame.dispatch = _A.dispatch
 frame:RegisterEvent("PLAYER_LOGIN")
-
-do
-  local dispatch = _A.dispatch
-  function frame:dispatch(key, ...)
-    return dispatch(key, self, ...)
-  end
-end
-
-listen("PLAYER_LOGIN", function(e, frame)
-  print("ok", frame)
-  return e:once(frame)
-end)
 
 listen("PLAYER_LOGIN", function(e, frame)
   frame.offset = 1
   frame.class = select(2, UnitClass("player"))
   frame.spec = GetSpecialization()
   frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-  for binding, action in map(OBroBindsDB, frame.class, frame.spec) do
-    frame:dispatch("SET_OVERRIDE_BINDING", false, binding, action[1], action[2], action[3], action[4])
+  for binding, action in map(nil, OBroBindsDB, frame.class, frame.spec) do
+    frame:dispatch("OVERRIDE_SET", false, binding, action[1], action[2], action[3], action[4])
   end
   if read(OBroBindsDB, 'GUI', 'open') then
-    frame:dispatch("GUI_TOGGLE")
+    frame:Show()
   end
   return e:once(frame)
 end)
@@ -34,24 +22,12 @@ listen("PLAYER_SPECIALIZATION_CHANGED", function(e, frame)
   ClearOverrideBindings(frame)
   frame.spec = GetSpecialization()
   for binding, action in map(OBroBindsDB, frame.class, frame.spec) do
-    frame:dispatch("SET_OVERRIDE_BINDING", false, binding, action[1], action[2], action[3], action[4])
+    frame:dispatch("OVERRIDE_SET", false, binding, action[1], action[2], action[3], action[4])
   end
   return e:next(frame)
 end)
 
-listen("SET_OVERRIDE_BINDING", function(e, frame, save, binding, kind, id, name, icon, locked)
-  if kind == "SPELL" then
-    SetOverrideBindingSpell(frame, false, binding, GetSpellInfo(id) or name)
-  elseif kind == "macro" then
-    SetOverrideBindingMacro(frame, false, binding, name)
-  elseif kind == "ITEM" then
-    SetOverrideBindingItem(frame, false, binding, name)
-  end
-  if save then
-    OBroBindsDB = write(OBroBindsDB, frame.class, frame.spec, binding, {kind, id, name, icon, locked})
-  end
-  return e:next(frame, binding, save, kind, id, name, icon, locked)
-end)
+listen("OVERRIDE_SET", _A.SetOverrideHandler)
 
 listen("GUI_TOGGLE", function(e, frame)
   OBroBindsDB = write(OBroBindsDB, 'GUI', 'open', not read(OBroBindsDB, 'GUI', 'open') and true or nil)
@@ -59,148 +35,163 @@ listen("GUI_TOGGLE", function(e, frame)
   return e:next(frame)
 end)
 
-listen("GUI_SHOW", function(e, frame)
-  frame:RegisterEvent("UPDATE_BINDINGS")
-  frame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
-  frame:RegisterEvent("UPDATE_MACROS")
-  frame:RegisterEvent("PLAYER_TALENT_UPDATE")
-  frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-  frame:RegisterEvent("PLAYER_REGEN_ENABLED")
-  return e:next(frame)
-end)
-
-
-listen("GET_OVERRIDE_BINDING", function(e, frame, binding)
-  local action = read(OBroBindsDB, frame.class, frame.spec, binding)
-  if action then
-    return e:next(frame, binding, action[1], action[2], action[3], action[4], action[5])
+do
+  local OnUpdate = _A.OnUpdateModifierHandler
+  local GetOverride = _A.GetOverrideHandler
+  local DelOverride = _A.DelOverrideHandler
+  local PickupOverride = _A.PickupOverrideHandler
+  local ReceiveOverride = _A.ReceiveOverrideHandler
+  local PromoteOverride = _A.PromoteOverrideHandler
+  local LockOverride = _A.LockOverrideHandler
+  local ActionBarSlotChanged = _A.ActionBarSlotChangedHandler
+  local UpdateTooltip = _A.UpdateTooltipHandler
+  local RefreshTooltip = _A.RefreshTooltipHandler
+  local OnHide
+  local function OnShow(e, frame)
+    frame.modifier = (IsAltKeyDown() and "ALT-" or "")..(IsControlKeyDown() and "CTRL-" or "")..(IsShiftKeyDown() and "SHIFT-" or "")
+    frame:SetScript("OnUpdate", OnUpdate)
+    frame:RegisterEvent("UPDATE_BINDINGS")
+    frame:RegisterEvent("ACTIONBAR_SLOT_CHANGED")
+    frame:RegisterEvent("UPDATE_MACROS")
+    frame:RegisterEvent("PLAYER_TALENT_UPDATE")
+    frame:RegisterEvent("PLAYER_REGEN_DISABLED")
+    frame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    listen("OVERRIDE_GET", GetOverride)
+    listen("OVERRIDE_DEL", DelOverride)
+    listen("OVERRIDE_PICKUP", PickupOverride)
+    listen("OVERRIDE_RECEIVE", ReceiveOverride)
+    listen("OVERRIDE_PROMOTE", PromoteOverride)
+    listen("OVERRIDE_LOCK", LockOverride)
+    listen("ACTIONBAR_SLOT_CHANGED", ActionBarSlotChanged)
+    listen("SHOW_TOOLTIP", UpdateTooltip)
+    listen("OFFSET_CHANGED", RefreshTooltip)
+    listen("UPDATE_BINDINGS", RefreshTooltip)
+    listen("MODIFIER_CHANGED", RefreshTooltip)
+    listen("PLAYER_TALENT_UPDATE", RefreshTooltip)
+    listen("PLAYER_SPECIALIZATION_CHANGED", RefreshTooltip)
+    listen("GUI_HIDE", OnHide)
+    return e:once(frame)
   end
-  return e:next(frame, binding, nil)
-end)
-
-listen("DEL_OVERRIDE_BINDING", function(e, frame, save, binding)
-  SetOverrideBinding(frame, false, binding, nil)
-  if save then
-    OBroBindsDB = write(OBroBindsDB, frame.class, frame.spec, binding, nil)
+  function OnHide(e, frame)
+    frame:SetScript("OnUpdate", nil)
+    frame:UnregisterEvent("UPDATE_BINDINGS")
+    frame:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
+    frame:UnregisterEvent("UPDATE_MACROS")
+    frame:UnregisterEvent("PLAYER_TALENT_UPDATE")
+    frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
+    frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+    release("OVERRIDE_GET", GetOverride)
+    release("OVERRIDE_DEL", DelOverride)
+    release("OVERRIDE_PICKUP", PickupOverride)
+    release("OVERRIDE_RECEIVE", ReceiveOverride)
+    release("OVERRIDE_PROMOTE", PromoteOverride)
+    release("OVERRIDE_LOCK", LockOverride)
+    release("ACTIONBAR_SLOT_CHANGED", ActionBarSlotChanged)
+    release("SHOW_TOOLTIP", UpdateTooltip)
+    release("OFFSET_CHANGED", RefreshTooltip)
+    release("UPDATE_BINDINGS", RefreshTooltip)
+    release("MODIFIER_CHANGED", RefreshTooltip)
+    release("PLAYER_TALENT_UPDATE", RefreshTooltip)
+    release("PLAYER_SPECIALIZATION_CHANGED", RefreshTooltip)
+    listen("GUI_SHOW", OnShow)
+    return e:once(frame)
   end
-  return e:next(frame, binding)
-end)
+  listen("GUI_SHOW", OnShow)
+end
 
-listen("PICKUP_BINDING", function(e, frame, button)
-  local binding = frame.modifier..button.key
-  if not read(OBroBindsDB, frame.class, frame.spec, binding, 5) then
-    if frame.mainbar[binding] then
-      PickupAction(frame.mainbar[binding] + frame.offset - 1)
-      return e:next(frame, button)
+do
+  local CreateButton = _A.CreateStanceButton
+  local UpdateButtons = _A.UpdateStanceButtonsHandler
+  listen("GUI_SHOW", function(e, frame)
+    frame.offset = 1
+    frame.stances = nil 
+    if frame.class == "ROGUE" then
+      write(frame, 'stances', push, CreateButton(frame, 73, 'ability_stealth', 1, 2, 3))
+    elseif true or frame.class == "DRUID" then
+      write(frame, 'stances', push, CreateButton(frame, 97,  'ability_racial_bearform',    1, 2, 3, 4))
+      write(frame, 'stances', push, CreateButton(frame, 73,  'ability_druid_catform',      1, 2, 3, 4))
+      write(frame, 'stances', push, CreateButton(frame, 109, 'spell_nature_forceofnature', 1))
     end
-    local kind, id, name = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
-    if kind == "SPELL" then
-      PickupSpell(id)
-    elseif kind == "MACRO" then
-      PickupMacro(name)
-    elseif kind == "ITEM" then
-      PickupItem(id)
-    elseif kind then
-      assert(false, "Unhandled pickup: "..kind)
+    if frame.stances ~= nil then
+      local OnHide
+      local function OnShow(e, frame)
+        listen("GUI_HIDE", OnHide)
+        listen("OFFSET_CHANGED", UpdateButtons)
+        listen("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
+        return push(e, UpdateButtons):once(frame, frame.offset)
+      end
+      function OnHide(e, frame)
+        release("OFFSET_CHANGED", UpdateButtons)
+        release("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
+        listen("GUI_SHOW", OnShow)
+        return e:once(frame)
+      end
+      push(e, OnShow)
     end
-    frame:dispatch("DEL_OVERRIDE_BINDING", true, binding)
-  end
-  return e:next(frame, button)
-end)
+    return e:once(frame)
+  end)
+end
 
-listen("RECEIVE_BINDING", function(e, frame, button)
-  local binding = frame.modifier..button.key
-  if not read(OBroBindsDB, frame.class, frame.spec, binding, 5) then
-    if frame.mainbar[binding] then
-      PlaceAction(frame.mainbar[binding] + frame.offset - 1)
-      return e:next(frame, button)
+do
+  local UpdateLayout = _A.UpdateOverrideLayoutHandler
+  local UpdateBindings = _A.UpdateOverrideBindingsHandler
+  local UpdateButtons = _A.UpdateOverrideButtonsHandler
+  local layout = _A.DEFAULT_KEYBOARD_LAYOUT
+  listen("GUI_SHOW", function(e, frame)
+    frame.mainbar = {}
+    frame.buttons = {}
+    local OnHide
+    local function OnShow(e, frame)
+      listen("UPDATE_LAYOUT", UpdateLayout)
+      listen("UPDATE_BINDINGS", UpdateBindings)
+      listen("UPDATE_BINDINGS", UpdateButtons)
+      listen("UPDATE_MACROS", UpdateButtons)
+      listen("OFFSET_CHANGED", UpdateButtons)
+      listen("MODIFIER_CHANGED", UpdateButtons)
+      listen("PLAYER_TALENT_UPDATE", UpdateButtons)
+      listen("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
+      listen("GUI_HIDE", OnHide)
+      return push(e, UpdateButtons, UpdateBindings):once(frame)
     end
-    local kind, id, link, arg1, arg2 = GetCursorInfo()
-    if kind == "spell" then
-      ClearCursor()
-      frame:dispatch("PICKUP_BINDING", button)
-      local id = arg2 or arg1
-      local name, _, icon = GetSpellInfo(id)
-      assert(id ~= nil, "GetCursorInfo() on spell, id should never be nil")
-      assert(name ~= nil, "GetCursorInfo() on spell, name should never be nil")
-      assert(icon ~= nil, "GetCursorInfo() on spell, icon should never be nil")
-      frame:dispatch("SET_OVERRIDE_BINDING", true, binding, strupper(kind), id, name, icon)
-
-    elseif kind == "macro" then
-      ClearCursor()
-      frame:dispatch("PICKUP_BINDING", button)
-      local name, icon = GetMacroInfo(id)
-      assert(id ~= nil, "GetCursorInfo() on macro, id should never be nil")
-      assert(type(id) == "number", "GetCursorInfo() on macro, id should always be number")
-      assert(name ~= nil, "GetCursorInfo() on macro, name should never be nil")
-      assert(icon ~= nil, "GetCursorInfo() on macro, icon should never be nil")
-      frame:dispatch("SET_OVERRIDE_BINDING", true, binding, strupper(kind), id, name, icon)
-
-    elseif kind == "item" then
-      ClearCursor()
-      local name = select(3, string.match(link, "^|c%x+|H(%a+):(%d+).+|h%[([^%]]+)"))
-      local icon = select(10, GetItemInfo(id))
-      assert(link ~= nil, "GetCursorInfo() on item, link should never be nil")
-      assert(name ~= nil, "GetCursorInfo() on item, name should never be nil")
-      assert(icon ~= nil, "GetCursorInfo() on item, icon should never be nil")
-      frame:dispatch("PICKUP_BINDING", button)
-      frame:dispatch("SET_OVERRIDE_BINDING", true, binding, strupper(kind), id, name, icon)
-
-    elseif kind then
-      assert(false, "Unhandled receive: "..kind)
+    function OnHide(e, frame)
+      release("UPDATE_LAYOUT", UpdateLayout)
+      release("UPDATE_BINDINGS", UpdateBindings)
+      release("UPDATE_BINDINGS", UpdateButtons)
+      release("UPDATE_MACROS", UpdateButtons)
+      release("OFFSET_CHANGED", UpdateButtons)
+      release("MODIFIER_CHANGED", UpdateButtons)
+      release("PLAYER_TALENT_UPDATE", UpdateButtons)
+      release("PLAYER_SPECIALIZATION_CHANGED", UpdateButtons)
+      listen("GUI_SHOW", OnShow)
+      return e:once(frame)
     end
+    return push(e, OnShow, UpdateLayout):once(frame, layout)
+  end)
+end
+
+do
+  local initialize, dropdown = _A.InitializeDropdownHandler
+  local function UpdateDropdown(e, frame, button)
+    dropdown.info.arg1 = button
+    ToggleDropDownMenu(1, nil, dropdown, "cursor", 0, 0, "root")
+    return e:next(frame, button)
   end
-  return e:next(frame, button)
-end)
-
-listen("PROMOTE_BINDING", function(e, frame, binding)
-  local action = GetBindingAction(binding, false)
-  local kind, name = string.match(action, "^(%w+) (.*)$")
-  print(e.key, binding, action, "|", kind, name)
-
-  if kind == 'SPELL' then
-    local icon, _, _, _, id = select(3, GetSpellInfo(name))
-    assert(name ~= nil)
-    frame:dispatch("SET_OVERRIDE_BINDING", true, binding, kind, id, name, icon or 134400)
-
-  elseif kind == 'MACRO' then
-    local id = GetMacroIndexByName(name)
-    local icon = select(2, GetMacroInfo(name))
-    assert(name ~= nil)
-    frame:dispatch("SET_OVERRIDE_BINDING", true, binding, kind, id, name, icon or 134400)
-
-  elseif kind == 'ITEM' then
-    local link, _, _, _, _, _, _, _, icon = select(2, GetItemInfo(name))
-    local id = link and select(4, string.find(link, "^|c%x+|H(%a+):(%d+)[|:]"))
-    assert(name ~= nil)
-    frame:dispatch("SET_OVERRIDE_BINDING", true, binding, kind, id, name, icon or 134400)
-
-  else
-    assert(false, "Unhandled type: "..kind)
-  end
-
-  return e:next(frame, binding)
-end)
-
-listen("LOCK_BINDING", function(e, frame, binding)
-  local value = not read(OBroBindsDB, frame.class, frame.spec, binding, 5) and true or nil
-  OBroBindsDB = write(OBroBindsDB, frame.class, frame.spec, binding, 5, value)
-  return e:next(frame, binding)
-end)
-
-listen("GUI_SHOW", ADDON:part("InitializeModifierListener"))
-listen("GUI_SHOW", ADDON:part("InitializeStanceHandler"))
-listen("GUI_SHOW", ADDON:part("InitializeMissingIconHandler"))
-listen("GUI_SHOW", ADDON:part("InitializeButtonHandler"))
-listen("GUI_SHOW", ADDON:part("InitializeTooltipHandler"))
-listen("GUI_SHOW", ADDON:part("InitializeDropdownHandler"))
-
-listen("GUI_HIDE", function(e, frame)
-  frame:UnregisterEvent("UPDATE_BINDINGS")
-  frame:UnregisterEvent("ACTIONBAR_SLOT_CHANGED")
-  frame:UnregisterEvent("UPDATE_MACROS")
-  frame:UnregisterEvent("PLAYER_TALENT_UPDATE")
-  frame:UnregisterEvent("PLAYER_REGEN_DISABLED")
-  frame:UnregisterEvent("PLAYER_REGEN_ENABLED")
-  return e:next(frame)
-end)
+  listen("GUI_SHOW", function(e, frame)
+    dropdown = CreateFrame("frame", nil, UIParent, "UIDropDownMenuTemplate")
+    dropdown.info = UIDropDownMenu_CreateInfo()
+    dropdown.displayMode = "MENU"
+    dropdown.initialize = initialize
+    local OnHide
+    local function OnShow(e, frame)
+      listen("SHOW_DROPDOWN", UpdateDropdown)
+      listen("GUI_HIDE", OnHide)
+      return e:once(frame)
+    end
+    function OnHide(e, frame)
+      release("SHOW_DROPDOWN", UpdateDropdown)
+      listen("GUI_SHOW", OnShow)
+      return e:once(frame)
+    end
+    return push(e, OnShow):once(frame)
+  end)
+end

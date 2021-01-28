@@ -31,7 +31,7 @@ local function read(tbl, key, ...)
   if not key then return tbl end
   return read(tbl[key], ...)
 end
-_A.write = write
+_A.read = read
 
 local function eof() end
 local function map(iter, ...)
@@ -59,7 +59,7 @@ local function write(tbl, key, ...)
   end
   return nil
 end
-_A.read = read
+_A.write = write
 
 local function next(fn, ...)
   if fn and type(fn) == 'function' then
@@ -80,9 +80,12 @@ do
   local SUBS
   local function listen(key, fn)
     for _, entry in map(ipairs, SUBS, key) do
-      if fn == entry then return end
+      if fn == entry then
+        return fn
+      end
     end
     SUBS = write(SUBS, key, shift, fn)
+    return fn
   end
   _A.listen = listen
 
@@ -124,34 +127,43 @@ do
       tinsert(pool, q)
       return ...
     end
-    local function dispatch(key, ...)
+    local function dispatch(self, key, ...)
       local subs = read(SUBS, key)
       if not subs then return end
       local q = push(tremove(pool) or setmetatable({}, Q), unpack(subs))
       --__NAMES = write(__NAMES, tostring(q), true)
       q.key = key
-      return reuse(q, q:next(...))
+      return reuse(q, q:next(self, ...))
     end
     _A.dispatch = dispatch
+
+    local once = true
+    local t = {}
+    function _A.REPORT()
+      print("----REPORT-subs")
+      if SUBS then
+        for k, v in pairs(SUBS) do
+          print(">>", k, #v)
+        end
+      end
+      if once then
+        for k, v in pairs(_A) do
+          t[k] = true
+        end
+        setmetatable(_A, {__mode = 'v'})
+        once = false
+      end
+      collectgarbage("collect")
+      for k, v in pairs(_A) do
+        t[k] = nil
+      end
+      print("----REPORT-refs")
+      for k in pairs(t) do
+        print("<<", k)
+      end
+      for k, v in pairs(_A) do
+        t[k] = true
+      end
+    end
   end
 end
-
-
-
-
-
-
-
-
---do
-  --local t = setmetatable({}, {__mode = 'v'})
-  --function addon:reg(name, fn)
-    --print("reg", name, fn)
-    --table.insert(t, fn)
-  --end
-  --function addon:rep()
-    --for k, v in pairs(t) do
-      --print("rep", k, v)
-    --end
-  --end
---end

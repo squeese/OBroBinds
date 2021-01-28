@@ -1,5 +1,4 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/FrameXML/UI.xsd">
-  <Script file="deps/util.funcs.lua" />
   <Frame name="OBroBindsFrameTemplate" movable="true" parent="UIParent" hidden="true" inherits="BackdropTemplate" virtual="true">
     <Size>
       <AbsDimension x="100" y="100" />
@@ -60,10 +59,67 @@
       </Button>
     </Frames>
   </Frame>
-  <!--
-  <Script file="deps/gui.parts.lua" />
+  <Button name="OBroBindsStanceButtonTemplate" inherits="ActionButtonTemplate" virtual="true">
+    <Scripts>
+      <OnLoad>
+        self:RegisterForClicks("AnyUp")
+      </OnLoad>
+      <OnClick>
+        local frame = self:GetParent()
+        frame.offset = self.offset ~= frame.offset and self.offset or 1
+        frame:dispatch("OFFSET_CHANGED")
+      </OnClick>
+    </Scripts>
+  </Button>
+  <Button name="OBroBindsOverrideButtonTemplate" inherits="ActionButtonTemplate" virtual="true">
+    <Scripts>
+      <OnLoad>
+        self:RegisterForDrag("LeftButton")
+        self:RegisterForClicks("AnyUp")
+        self.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+        self.AutoCastable:SetTexCoord(0.15, 0.6, 0.6, 0.15)
+        self.AutoCastable:ClearAllPoints()
+        self.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
+        self.AutoCastable:SetScale(0.4)
+        self.AutoCastable:SetAlpha(0.75)
+        --button.LevelLinkLockIcon:Show()
+        --button.SpellHighlightTexture:Show()
+        --button.NewActionTexture:Show()
+      </OnLoad>
+      <OnEnter>
+        self:GetParent():dispatch("SHOW_TOOLTIP", self)
+      </OnEnter>
+      <OnLeave>
+        GameTooltip:Hide()
+      </OnLeave>
+      <OnDragStart>
+        if InCombatLockdown() then return end
+        self:GetParent():dispatch("OVERRIDE_PICKUP", self)
+        self:Update()
+      </OnDragStart>
+      <OnReceiveDrag>
+        if InCombatLockdown() then return end
+        self:GetParent():dispatch("OVERRIDE_RECEIVE", self)
+        self:Update()
+      </OnReceiveDrag>
+      <OnClick>
+        if InCombatLockdown() then return end
+        if button == "RightButton" then
+          local frame = self:GetParent()
+          local binding = frame.modifier..self.key
+          if not frame.mainbar[binding] then
+            frame:dispatch("SHOW_DROPDOWN", self)
+          end
+        elseif GetCursorInfo() then
+          self:GetParent():dispatch("OVERRIDE_RECEIVE", self)
+          self:Update()
+        end
+      </OnClick>
+    </Scripts>
+  </Button>
+  <Script file="deps/util.funcs.lua" />
+  <Script file="deps/gui.stances.lua" />
   <Script file="deps/layouts.lua" />
-  -->
   <Script file="OBroBinds.lua" />
 
   <!--

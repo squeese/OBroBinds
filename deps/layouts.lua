@@ -1,6 +1,5 @@
-local _, addon = ...
-local next = addon.next
-local mmax = math.max
+local _A = select(2, ...)
+local next, mmax, tinsert = _A.next, math.max, table.insert
 
 local function col(self, _, y, s, x, fn, ...)
   return next(fn, self, mmax(0, x * s), y, s, ...)
@@ -50,7 +49,7 @@ local function layout(size, fn, ...)
   return select(2, next(fn, {}, 0, 0, 40, ...))
 end
 
-addon.DEFAULT_KEYBOARD_LAYOUT = layout(40,
+_A.DEFAULT_KEYBOARD_LAYOUT = layout(40,
   keys, 1, 0, "F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12", col, 0,    row, 1,
   keys, 1, 0, "1 2 3 4 5 6 7 8 9 0 - =",                col, 0.3,  row, 2,
   keys, 1, 0, "q w e r t y u i o p [ ]",                col, 0.6,  row, 3,
