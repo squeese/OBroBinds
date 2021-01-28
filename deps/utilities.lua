@@ -11,7 +11,9 @@ _A.splice = splice
 local function shift(tbl, ...)
   for i = 1, select("#", ...) do
     local arg = select(i, ...)
-    tinsert(tbl, i, arg)
+    if arg ~= nil then
+      tinsert(tbl, 1, arg)
+    end
   end
   return tbl
 end
@@ -20,7 +22,9 @@ _A.shift = shift
 local function push(tbl, ...)
   for i = 1, select("#", ...) do
     local arg = select(i, ...)
-    tinsert(tbl, arg)
+    if arg ~= nil then
+      tinsert(tbl, arg)
+    end
   end
   return tbl
 end
@@ -79,6 +83,7 @@ _A.match = match
 do
   local SUBS
   local function listen(key, fn)
+    if not fn then return nil end
     for _, entry in map(ipairs, SUBS, key) do
       if fn == entry then
         return fn
@@ -117,10 +122,8 @@ do
       return self:release():next(...)
     end
 
-    --local __NAMES
     local pool = {}
     local function reuse(q, ...)
-      --__NAMES = write(__NAMES, tostring(q), nil)
       for key in pairs(q) do
         q[key] = nil
       end
@@ -131,39 +134,44 @@ do
       local subs = read(SUBS, key)
       if not subs then return end
       local q = push(tremove(pool) or setmetatable({}, Q), unpack(subs))
-      --__NAMES = write(__NAMES, tostring(q), true)
       q.key = key
       return reuse(q, q:next(self, ...))
     end
     _A.dispatch = dispatch
 
-    local once = true
-    local t = {}
-    function _A.REPORT()
-      print("----REPORT-subs")
-      if SUBS then
-        for k, v in pairs(SUBS) do
-          print(">>", k, #v)
-        end
-      end
-      if once then
-        for k, v in pairs(_A) do
-          t[k] = true
-        end
-        setmetatable(_A, {__mode = 'v'})
-        once = false
-      end
-      collectgarbage("collect")
-      for k, v in pairs(_A) do
-        t[k] = nil
-      end
-      print("----REPORT-refs")
-      for k in pairs(t) do
-        print("<<", k)
-      end
-      for k, v in pairs(_A) do
-        t[k] = true
-      end
-    end
+    --local once = true
+    --local t = {}
+    --function _A.REPORT()
+      --print("----REPORT-subs")
+      --if SUBS then
+        --for k, v in pairs(SUBS) do
+          --print(">>", k, #v)
+        --end
+      --end
+      --if once then
+        --for k, v in pairs(_A) do
+          --t[k] = true
+        --end
+        --setmetatable(_A, {__mode = 'v'})
+        --once = false
+      --end
+      --collectgarbage("collect")
+      --for k, v in pairs(_A) do
+        --t[k] = nil
+      --end
+      --print("----REPORT-refs")
+      --for k in pairs(t) do
+        --print("<<", k)
+      --end
+      --for k, v in pairs(_A) do
+        --t[k] = true
+      --end
+      --print("----REPORT-names")
+      --if __NAMES then
+        --for k in pairs(__NAMES) do
+          --print("??", k)
+        --end
+      --end
+    --end
   end
 end

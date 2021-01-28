@@ -1,5 +1,6 @@
 local _A = select(2, ...)
-local push, match, read, write = _A.push, _A.match, _A.read, _A.write
+local push, match, read, write, map = _A.push, _A.match, _A.read, _A.write, _A.map
+local KIND, ID, NAME, ICON, LOCKED = 1, 2, 3, 4, 5
 
 do
   local elapsed, pa, pc, ps, modifier = 0
@@ -165,10 +166,19 @@ function _A.UpdateOverrideButtonsHandler(e, frame)
   return e:next(frame)
 end
 
+function _A.SetAllOverridesHandler(e, frame)
+  frame.spec = GetSpecialization()
+  ClearOverrideBindings(frame)
+  for binding, action in map(OBroBindsDB, frame.class, frame.spec) do
+    frame:dispatch("OVERRIDE_SET", false, binding, action[1], action[2], action[3], action[4])
+  end
+  return e:next(frame)
+end
+
 function _A.SetOverrideHandler(e, frame, save, binding, kind, id, name, icon, locked)
   if kind == "SPELL" then
     SetOverrideBindingSpell(frame, false, binding, GetSpellInfo(id) or name)
-  elseif kind == "macro" then
+  elseif kind == "MACRO" then
     SetOverrideBindingMacro(frame, false, binding, name)
   elseif kind == "ITEM" then
     SetOverrideBindingItem(frame, false, binding, name)
@@ -182,7 +192,7 @@ end
 function _A.GetOverrideHandler(e, frame, binding)
   local action = read(OBroBindsDB, frame.class, frame.spec, binding)
   if action then
-    return e:next(frame, binding, action[1], action[2], action[3], action[4], action[5])
+    return e:next(frame, binding, action[KIND], action[ID], action[NAME], action[ICON], action[LOCKED])
   end
   return e:next(frame, binding, nil)
 end
@@ -195,26 +205,41 @@ function _A.DelOverrideHandler(e, frame, save, binding)
   return e:next(frame, binding)
 end
 
-function _A.PickupOverrideHandler(e, frame, button)
-  local binding = frame.modifier..button.key
-  if not read(OBroBindsDB, frame.class, frame.spec, binding, 5) then
-    if frame.mainbar[binding] then
-      PickupAction(frame.mainbar[binding] + frame.offset - 1)
-      return e:next(frame, button)
-    end
-    local kind, id, name = select(3, frame:dispatch("OVERRIDE_GET", binding))
-    if kind == "SPELL" then
-      PickupSpell(id)
-    elseif kind == "MACRO" then
-      PickupMacro(name)
-    elseif kind == "ITEM" then
-      PickupItem(id)
-    elseif kind then
-      assert(false, "Unhandled pickup: "..kind)
-    end
-    frame:dispatch("OVERRIDE_DEL", true, binding)
+do
+  local function CURSOR_UPDATE(e, frame)
+    frame.__cursor = nil
+    frame:UnregisterEvent("CURSOR_UPDATE")
+    return e:once(frame)
   end
-  return e:next(frame, button)
+  function _A.PickupOverrideHandler(e, frame, button)
+    local binding = frame.modifier..button.key
+    if not read(OBroBindsDB, frame.class, frame.spec, binding, 5) then
+      if frame.mainbar[binding] then
+        PickupAction(frame.mainbar[binding] + frame.offset - 1)
+        return e:next(frame, button)
+      end
+      local kind, id, name, icon = select(3, frame:dispatch("OVERRIDE_GET", binding))
+      if kind == "SPELL" then
+        PickupSpell(id)
+        if not GetCursorInfo() then
+          local macro = CreateMacro("__OBRO_TMP", select(3, GetSpellInfo(id)) or icon)
+          PickupMacro(macro)
+          DeleteMacro(macro)
+          frame.__cursor = read(OBroBindsDB, frame.class, frame.spec, binding)
+          frame:RegisterEvent("CURSOR_UPDATE")
+          _A.listen("CURSOR_UPDATE", CURSOR_UPDATE)
+        end
+      elseif kind == "MACRO" then
+        PickupMacro(name)
+      elseif kind == "ITEM" then
+        PickupItem(id)
+      elseif kind then
+        assert(false, "Unhandled pickup: "..kind)
+      end
+      frame:dispatch("OVERRIDE_DEL", true, binding)
+    end
+    return e:next(frame, button)
+  end
 end
 
 function _A.ReceiveOverrideHandler(e, frame, button)
@@ -234,6 +259,11 @@ function _A.ReceiveOverrideHandler(e, frame, button)
       assert(name ~= nil, "GetCursorInfo() on spell, name should never be nil")
       assert(icon ~= nil, "GetCursorInfo() on spell, icon should never be nil")
       frame:dispatch("OVERRIDE_SET", true, binding, strupper(kind), id, name, icon)
+    elseif kind == "macro" and id == 0 then
+      local action = frame.__cursor
+      ClearCursor()
+      frame:dispatch("OVERRIDE_PICKUP", button)
+      frame:dispatch("OVERRIDE_SET", true, binding, action[KIND], action[ID], action[NAME], action[ICON])
     elseif kind == "macro" then
       ClearCursor()
       frame:dispatch("OVERRIDE_PICKUP", button)
@@ -369,7 +399,8 @@ do
     CloseDropDownMenus()
   end
 
-  local function reset(info)
+  local drop, info
+  local function reset()
     info.hasArrow = false
     info.menuList = nil
     info.isTitle = false
@@ -379,85 +410,107 @@ do
     info.func = nil
   end
 
-  function _A.InitializeDropdownHandler(self, _, section)
-    local button = self.info.arg1
+  local function InitializeDropdown(self, _, section)
+    local button = info.arg1
     local frame = button:GetParent()
     local binding = frame.modifier..button.key
-    self.info.arg2 = binding
+    info.arg2 = binding
 
     if section == "root" then
       local kind, id, name, _, locked = select(3, frame:dispatch("OVERRIDE_GET", binding))
       local action = GetBindingAction(binding, false)
 
-      reset(self.info)
-      self.info.text = "Override"
-      self.info.isTitle = true
-      UIDropDownMenu_AddButton(self.info, 1)
+      reset()
+      info.text = "Override"
+      info.isTitle = true
+      UIDropDownMenu_AddButton(info, 1)
 
-      reset(self.info)
-      self.info.text = not kind and 'none' or kind.." "..name
-      self.info.hasArrow = not locked
-      self.info.menuList = "override"
-      self.info.disabled = locked
-      UIDropDownMenu_AddButton(self.info, 1)
+      reset()
+      info.text = not kind and 'none' or kind.." "..name
+      info.hasArrow = not locked
+      info.menuList = "override"
+      info.disabled = locked
+      UIDropDownMenu_AddButton(info, 1)
       UIDropDownMenu_AddSeparator(1)
 
-      reset(self.info)
-      self.info.text = "Binding"
-      self.info.isTitle = true
-      UIDropDownMenu_AddButton(self.info, 1)
+      reset()
+      info.text = "Binding"
+      info.isTitle = true
+      UIDropDownMenu_AddButton(info, 1)
 
-      reset(self.info)
-      self.info.text = action == "" and "none" or action
-      self.info.hasArrow = not locked and action ~= ""
-      self.info.menuList = "binding"
-      self.info.disabled = locked
-      UIDropDownMenu_AddButton(self.info, 1)
+      reset()
+      info.text = action == "" and "none" or action
+      info.hasArrow = not locked and action ~= ""
+      info.menuList = "binding"
+      info.disabled = not info.hasArrow
+      UIDropDownMenu_AddButton(info, 1)
 
-      reset(self.info)
-      self.info.text = locked and "Unlock" or "Lock"
-      self.info.notCheckable = false
-      self.info.checked = locked
-      self.info.func = LockBinding
-      UIDropDownMenu_AddButton(self.info, 1)
+      reset()
+      info.text = locked and "Unlock" or "Lock"
+      info.notCheckable = false
+      info.checked = locked
+      info.func = LockBinding
+      UIDropDownMenu_AddButton(info, 1)
 
     elseif section == "override" then
       local kind, id, name, _, locked = select(3, frame:dispatch("OVERRIDE_GET", binding))
 
       if kind == 'BLOB' then
-        reset(self.info)
-        self.info.text = "Edit blob"
-        self.info.func = EditBlob
-        UIDropDownMenu_AddButton(self.info, 2)
+        reset()
+        info.text = "Edit blob"
+        info.func = EditBlob
+        UIDropDownMenu_AddButton(info, 2)
       end
 
       if kind then
-        reset(self.info)
-        self.info.text = "Clear override"
-        self.info.func = RemoveOverride
-        UIDropDownMenu_AddButton(self.info, 2)
+        reset()
+        info.text = "Clear override"
+        info.func = RemoveOverride
+        UIDropDownMenu_AddButton(info, 2)
       else
-        reset(self.info)
-        self.info.text = "Create blob"
-        self.info.func = CreateBlob
-        UIDropDownMenu_AddButton(self.info, 2)
+        reset()
+        info.text = "Create blob"
+        info.func = CreateBlob
+        UIDropDownMenu_AddButton(info, 2)
       end
 
     elseif section == "binding" then
       local action = GetBindingAction(binding, false)
-      local kind, info = string.match(action, "^(%w+) (.*)$")
+      local kind, name = string.match(action, "^(%w+) (.*)$")
 
       if kind == 'SPELL' or kind == 'MACRO' or kind == 'ITEM' then
-        reset(self.info)
-        self.info.text = "Promote to override"
-        self.info.func = PromoteBinding
-        UIDropDownMenu_AddButton(self.info, 2)
+        reset()
+        info.text = "Promote to override"
+        info.func = PromoteBinding
+        UIDropDownMenu_AddButton(info, 2)
       end
 
-      reset(self.info)
-      self.info.text = "Clear binding"
-      self.info.func = RemoveBinding
-      UIDropDownMenu_AddButton(self.info, 2)
+      reset()
+      info.text = "Clear binding"
+      info.func = RemoveBinding
+      UIDropDownMenu_AddButton(info, 2)
     end
   end
+
+  function _A.UpdateDropdownHandler(e, frame, button)
+    if not drop then
+      info = UIDropDownMenu_CreateInfo()
+      drop = CreateFrame("frame", nil, UIParent, "UIDropDownMenuTemplate")
+      drop.displayMode = "MENU"
+      drop.initialize = InitializeDropdown
+    end
+    info.arg1 = button
+    ToggleDropDownMenu(1, nil, drop, "cursor", 0, 0, "root")
+    return e:next(frame, button)
+  end
+end
+
+function _A.UpdateUnknownSpellsHandler(e, frame)
+  for binding, action in map(nil, read(OBroBindsDB, frame.class, frame.spec)) do
+    if not action[ID] then
+      local icon, _, _, _, id = select(3, GetSpellInfo(action[NAME]))
+      action[ID], action[ICON] = id, icon or action[ICON]
+    end
+  end
+  return e:next(frame)
 end
