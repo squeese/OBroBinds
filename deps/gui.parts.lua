@@ -355,7 +355,7 @@ do
     if kind == 'ITEM' then return true end
   end
   local function RemoveOverride(self, button, binding)
-    button:GetParent():dispatch("OVERRIDE_DEL", true, binding)
+    button:GetParent():dispatch("DEL_OVERRIDE_BINDING", true, binding)
     button:Update()
     CloseDropDownMenus()
   end
@@ -365,81 +365,117 @@ do
     CloseDropDownMenus()
   end
   local function PromoteBinding(self, button, binding)
-    button:GetParent():dispatch("OVERRIDE_PROMOTE", binding)
+    button:GetParent():dispatch("PROMOTE_BINDING", binding)
     SetBinding(binding, nil)
     SaveBindings(GetCurrentBindingSet())
     CloseDropDownMenus()
   end
   local function LockBinding(self, button, binding)
-    button:GetParent():dispatch("OVERRIDE_LOCK", binding)
+    button:GetParent():dispatch("LOCK_BINDING", binding)
     button:Update()
     CloseDropDownMenus()
-  end
-
-  local function set(i, level, ...)
-    i.text, i.hasArrow, i.menuList, i.isTitle, i.disabled, i.notCheckable, i.checked, i.func = ...
-    UIDropDownMenu_AddButton(i, level)
   end
 
   function _A.InitializeTooltipHandler(self, _, section)
     local button = self.info.arg1
     local frame = button:GetParent()
     local binding = frame.modifier..button.key
-    local i = self.info
-    i.arg2 = binding
+    self.info.arg2 = binding
 
     if section == "root" then
-      set(i, 1, "Override", false, nil, true, true, true, false, nil)
-      local kind, id, name, _, locked = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
-      set(i, 1, not kind and 'none' or kiknd.." "..name, not locked, "override", false, locked, true, false, nil)
+      info.text = "Override"
+      info.hasArrow = false
+      info.menuList = nil
+      info.isTitle = true
+      info.disabled = true
+      info.notCheckable = true
+      UIDropDownMenu_AddButton(info, 1)
 
+      local kind, id, name, _, locked = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
+      if not kind then
+        info.text = 'none'
+      else
+        info.text = kind.." "..name
+      end
+      info.hasArrow = not locked
+      info.menuList = "override"
+      info.isTitle = false
+      info.disabled = locked
+      info.notCheckable = true
+      info.checked = false
+      UIDropDownMenu_AddButton(info, 1)
       UIDropDownMenu_AddSeparator(1)
-      set(i, 1, "Binding", false, nil, true, true, true, false, nil)
+
+      info.text = "Binding"
+      info.hasArrow = false
+      info.menuList = nil
+      info.isTitle = true
+      info.disabled = true
+      info.notCheckable = true
+      info.checked = false
+      UIDropDownMenu_AddButton(info)
+
       local action = GetBindingAction(binding, false)
-      set(i, 1, action == "" and "none" or action, not locked and action ~= "", "binding", false, false, true, false, nil)
-      set(i, 1, locked and "Unlock" or "Lock", false, nil, false, false, false, locked, LockBinding)
+      info.text = action == "" and "none" or action
+      info.hasArrow = not locked and action ~= ""
+      info.menuList = "binding"
+      info.isTitle = false
+      info.disabled = locked or action == ""
+      info.notCheckable = true
+      info.checked = false
+      UIDropDownMenu_AddButton(info, 1)
+
+      info.text = locked and "Unock" or "Lock"
+      info.hasArrow = false
+      info.menuList = nil
+      info.isTitle = false
+      info.disabled = false
+      info.func = LockBinding
+      info.notCheckable = false
+      info.checked = locked
+      UIDropDownMenu_AddButton(info, 1)
 
     elseif section == "override" then
-      --info.hasArrow = false
-      --info.menuList = nil
-      --info.isTitle = false
-      --info.disabled = false
-      --info.notCheckable = true
-      --info.checked = false
+      info.hasArrow = false
+      info.menuList = nil
+      info.isTitle = false
+      info.disabled = false
+      info.notCheckable = true
+      info.checked = false
 
-      --local kind = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
-      --if kind == 'blob' then
-        --info.text = "Edit blob"
-        --info.func = EditBlob
-        --UIDropDownMenu_AddButton(info, 2)
-      --end
-      --if kind then
-        --info.text = "Clear override"
-        --info.func = RemoveOverride
-        --UIDropDownMenu_AddButton(info, 2)
-      --end
-      --if not kind then
-        --info.text = "Create blob"
-        --info.func = CreateBlob
-        --UIDropDownMenu_AddButton(info, 2)
-      --end
+      local kind = select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))
+      if kind == 'blob' then
+        info.text = "Edit blob"
+        info.func = EditBlob
+        UIDropDownMenu_AddButton(info, 2)
+      end
+      if kind then
+        info.text = "Clear override"
+        info.func = RemoveOverride
+        UIDropDownMenu_AddButton(info, 2)
+      end
+      if not kind then
+        info.text = "Create blob"
+        info.func = CreateBlob
+        UIDropDownMenu_AddButton(info, 2)
+      end
 
     elseif section == "binding" then
-      --info.hasArrow = false
-      --info.menuList = nil
-      --info.isTitle = false
-      --info.disabled = false
+      info.hasArrow = false
+      info.menuList = nil
+      info.isTitle = false
+      info.disabled = false
 
-      --local action = GetBindingAction(binding, false)
-      --if actionPromotable(action, select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))) then
-        --info.text = "Promote to override"
-        --info.func = PromoteBinding
-        --UIDropDownMenu_AddButton(info, 2)
-      --end
+      local action = GetBindingAction(binding, false)
+      if actionPromotable(action, select(3, frame:dispatch("GET_OVERRIDE_BINDING", binding))) then
+        info.text = "Promote to override"
+        info.func = PromoteBinding
+        UIDropDownMenu_AddButton(info, 2)
+      end
 
-      --info.text = "Clear binding"
-      --info.func = RemoveBinding
-      --UIDropDownMenu_AddButton(info, 2)
+      info.text = "Clear binding"
+      info.func = RemoveBinding
+      UIDropDownMenu_AddButton(info, 2)
     end
   end
 end
