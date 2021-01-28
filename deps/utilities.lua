@@ -8,14 +8,12 @@ local function splice(tbl, index)
 end
 _A.splice = splice
 
-local function shift(tbl, ...)
+local function shift(self, ...)
   for i = 1, select("#", ...) do
     local arg = select(i, ...)
-    if arg ~= nil then
-      tinsert(tbl, 1, arg)
-    end
+    tinsert(self, i, arg)
   end
-  return tbl
+  return self
 end
 _A.shift = shift
 
@@ -138,40 +136,85 @@ do
       return reuse(q, q:next(self, ...))
     end
     _A.dispatch = dispatch
-
-    --local once = true
-    --local t = {}
-    --function _A.REPORT()
-      --print("----REPORT-subs")
-      --if SUBS then
-        --for k, v in pairs(SUBS) do
-          --print(">>", k, #v)
-        --end
-      --end
-      --if once then
-        --for k, v in pairs(_A) do
-          --t[k] = true
-        --end
-        --setmetatable(_A, {__mode = 'v'})
-        --once = false
-      --end
-      --collectgarbage("collect")
-      --for k, v in pairs(_A) do
-        --t[k] = nil
-      --end
-      --print("----REPORT-refs")
-      --for k in pairs(t) do
-        --print("<<", k)
-      --end
-      --for k, v in pairs(_A) do
-        --t[k] = true
-      --end
-      --print("----REPORT-names")
-      --if __NAMES then
-        --for k in pairs(__NAMES) do
-          --print("??", k)
-        --end
-      --end
-    --end
   end
+
+end
+
+do
+  local function walk(self, fn, ...)
+    if type(fn) == 'function' then
+      return fn(self, ...)
+    end
+    return self
+  end
+  local function clean(self, ...)
+    for i = #self, 1, -1 do
+      self[i] = nil
+    end
+    return walk(self, ...)
+  end
+  local STATE = {}
+  STATE.__index = STATE
+  function STATE.skip(self, arg1, arg2, ...)
+    return walk(shift(self, arg1, arg2), ...)
+  end
+  function STATE.push(self, fn, ...)
+    if not fn then
+      return walk(self, ...)
+    end
+    tinsert(self:args(...), self.__numcalls, fn)
+    return walk(shift(self, self.skip, self.push, fn), ...)
+  end
+  function STATE.call(self, fn, ...)
+    fn(self:args(...))
+    return walk(shift(self, self.skip, self.call, fn), ...)
+  end
+  function STATE.init(self, fn, ...)
+    if fn then
+      tinsert(self:args(...), self.__numcalls, fn)
+    end
+    return walk(self, ...)
+  end
+  function STATE.unregister(self, event, ...)
+    local _, frame = self:args(...)
+    frame:UnregisterEvent(event)
+    return walk(shift(self, self.register, event), ...)
+  end
+  function STATE.register(self, event, ...)
+    local _, frame = self:args(...)
+    frame:RegisterEvent(event)
+    return walk(shift(self, self.unregister, event), ...)
+  end
+  local release = _A.release
+  function STATE.release(self, event, fn, ...)
+    release(event, fn)
+    return walk(shift(self, self.listen, event, fn), ...) end
+  local listen = _A.listen
+  function STATE.listen(self, event, fn, ...)
+    listen(event, fn)
+    return walk(shift(self, self.release, event, fn), ...)
+  end
+  function STATE.final(self, fn1, fn2, ...)
+    return fn1(push(self, self.final, fn2, fn1), ...)
+  end
+  function STATE.bounce(self, key, e, ...)
+    listen(key, push(self, self.arf, e.key))
+    return e:once(...)
+    --return fn(push(self, self.arf, fn), ...)
+  end
+  function STATE.toggle(self, e, ...)
+    --push(push(tmp, ...), push(self, self.toggle))
+    --return e:next(next(tmp, clean, unpack(tmp)))
+    push(self, self.toggle)
+    return e:next(...)
+  end
+  function STATE:__call(e, frame, ...)
+    self.__numargs = 2+select("#", ...)
+    self.__numcalls = #e+1
+    return walk(push(self, e, frame, ...), clean, unpack(self))
+  end
+  function STATE:args(...)
+    return select(select("#", ...)-self.__numargs+1, ...)
+  end
+  _A.STATE = STATE
 end
