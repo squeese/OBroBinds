@@ -3,56 +3,97 @@ local push, match, read, write, map = _A.push, _A.match, _A.read, _A.write, _A.m
 local KIND, ID, NAME, ICON, LOCKED = 1, 2, 3, 4, 5
 
 do
-  local elapsed, pa, pc, ps, modifier = 0
-  function _A.UpdateCurrentModifier(self, delta)
+  local function dispatch(page, event, ...)
+    local parent = page:GetParent()
+    return parent:dispatch(event, ...)
+  end
+  function _A.InitializeRoot(e, root, ...)
+    print("InitializeRoot", e.key, root, root.pageKeyboard)
+    root.pageKeyboard.dispatch = dispatch
+    root.pageSettings.dispatch = dispatch
+    root.pageKeyboard:Show()
+    return e(root, ...)
+  end
+end
+
+function _A.UpdateRootPersistState(e, root, ...)
+  print("UpdateRootPersistState", e.key, root, root.pageKeyboard)
+  OBroBindsDB = write(OBroBindsDB, 'GUI', 'open', e.key == "ADDON_ROOT_SHOW" and true or nil)
+  return e(root, ...)
+end
+
+do
+  local elapsed, pa, pc, ps, modifier = 0, IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
+  local function OnUpdate(self, delta)
     elapsed = elapsed + delta
     if elapsed < 0.1 then return end
     local na, nc, ns = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
     if pa ~= na or pc ~= nc or ps ~= ns then
       pa, pc, ps = na, nc, ns
       self.modifier = (pa and "ALT-" or "")..(pc and "CTRL-" or "")..(ps and "SHIFT-" or "")
-      self:dispatch("MODIFIER_CHANGED")
+      self:dispatch("ADDON_MODIFIER_CHANGED", self)
     end
     elapsed = 0
   end
+
+  local function CreateStanceButton(page, offset, icon, ...)
+    local button = CreateFrame("button", nil, page, "OBroBindsStanceButtonTemplate")
+    button.offset = offset
+    button.icon:SetTexture("Interface/Icons/"..icon)
+    return push(button, ...)
+  end
+
+  function _A.InitializePageKeyboard(e, root, ...)
+    print("InitializePageKeyboard", e.key)
+    local page = root.pageKeyboard
+    page:SetScript("OnUpdate", OnUpdate)
+    page.modifier = (IsAltKeyDown() and "ALT-" or "")..(IsControlKeyDown() and "CTRL-" or "")..(IsShiftKeyDown() and "SHIFT-" or "")
+    --page.mainbar = {}
+    page.buttons = {}
+    page.offset = 1
+    page.stances = nil
+    if root.class == "ROGUE" then
+      write(page, 'stances', push, CreateStanceButton(page, 73, 'ability_stealth', 1, 2, 3))
+    elseif true or root.class == "DRUID" then
+      write(page, 'stances', push, CreateStanceButton(page, 97,  'ability_racial_bearform',    1, 2, 3, 4))
+      write(page, 'stances', push, CreateStanceButton(page, 73,  'ability_druid_catform',      1, 2, 3, 4))
+      write(page, 'stances', push, CreateStanceButton(page, 109, 'spell_nature_forceofnature', 1))
+    end
+    return e(root, _A.DEFAULT_KEYBOARD_LAYOUT, ...)
+  end
 end
 
-function _A.CreateStanceButton(frame, offset, icon, ...)
-  local button = CreateFrame("button", nil, frame, "OBroBindsStanceButtonTemplate")
-  button.offset = offset
-  button.icon:SetTexture("Interface/Icons/"..icon)
-  return push(button, ...)
-end
-
-function _A.UpdateStanceButtons(e, frame, ...)
-  local prev
-  for _, button in ipairs(frame.stances) do
-    if match(frame.spec, unpack(button)) then
-      button:Show()
-      button:ClearAllPoints()
-      if not prev then
-        button:SetPoint("LEFT", frame, "TOPLEFT", 12, 4)
-      else
-        button:SetPoint("LEFT", prev, "RIGHT", 4, 0)
-      end
-      if frame.offset == button.offset then
-        button.Border:Show()
-      else
-        button.Border:Hide()
-      end
-      prev = button
-    else
+function _A.UpdateKeyboardStanceButtons(e, root, ...)
+  print("UpdateKeyboardStanceButtons", e.key)
+  local page = root.pageKeyboard
+  if page.stances then
+    local prev
+    for _, button in ipairs(page.stances) do
       button:Hide()
+      if match(root.spec, unpack(button)) then
+        button:Show()
+        button:ClearAllPoints()
+        if not prev then
+          button:SetPoint("LEFT", page, "TOPLEFT", 0, -36)
+        else
+          button:SetPoint("LEFT", prev, "RIGHT", 4, 0)
+        end
+        button.Border:Hide()
+        if page.offset == button.offset then
+          button.Border:Show()
+        end
+        prev = button
+      end
     end
   end
-  return e:next(frame, ...)
+  return e(root, ...)
 end
 
 do
-  local function UpdateMainbarButton(self, frame, binding, slot)
+  local function UpdateKeyboardMainbarActionButton(self, page, binding, slot)
     local kind, id = GetActionInfo(slot)
     self.Border:Show()
-    self.Name:SetText(frame.mainbar[binding])
+    self.Name:SetText(page.mainbar[binding])
     self.icon:SetVertexColor(1, 1, 1, 1)
     if kind == 'spell' then
       self.icon:SetTexture(select(3, GetSpellInfo(id)))
@@ -65,33 +106,27 @@ do
     end
   end
 
-  local function UpdateOverrideButton(self, frame, binding)
-    local kind, id, name, icon, locked = select(3, frame:dispatch("GET_OVERRIDE_ENTRY", binding))
+  local function UpdateKeyboardBindingActionButton(self, page, binding)
     self.Border:Hide()
     self.Name:SetText()
-    local hasBinding = GetBindingAction(binding, false) ~= ""
-    self.icon:SetVertexColor(1, 1, 1, 1)
-    if kind == 'SPELL' then
-      self.icon:SetTexture(select(3, GetSpellInfo(id)) or icon)
-    elseif kind == 'MACRO' then
-      self.icon:SetTexture(select(2, GetMacroInfo(name)) or icon)
-    elseif kind == 'ITEM' then
-      self.icon:SetTexture(select(10, GetItemInfo(id or 0)) or icon)
-    elseif kind == 'BLOB' then
-      self.icon:SetTexture(441148)
-
-    elseif hasBinding then
-      self.icon:SetTexture(136243)
+    local override = page:dispatch("ADDON_GET_OVERRIDE_BINDING", binding)
+    local hasAction = GetBindingAction(binding, false) ~= ""
+    local icon = override.icon
+    if icon then
+      self.icon:SetVertexColor(1, 1, 1, 1)
+      self.icon:SetTexture(icon)
+    elseif hasAction then
       self.icon:SetVertexColor(0.8, 1, 0.1, 0.1)
+      self.icon:SetTexture(136243)
     else
       self.icon:SetTexture(nil)
     end
-    if hasBinding then
+    if hasAction then
       self.AutoCastable:Show()
     else
       self.AutoCastable:Hide()
     end
-    if locked then
+    if override.locked then
       self.LevelLinkLockIcon:Show()
     else
       self.LevelLinkLockIcon:Hide()
@@ -99,35 +134,44 @@ do
   end
 
   local function Update(self)
-    local frame = self:GetParent()
-    local binding = frame.modifier..self.key
-    if frame.mainbar[binding] then
-      local slot = frame.mainbar[binding] + frame.offset - 1
-      frame.mainbar[slot] = self
-      UpdateMainbarButton(self, frame, binding, slot)
+    local page = self:GetParent()
+    local binding = page.modifier..self.key
+    if page.mainbar[binding] then
+      UpdateKeyboardMainbarActionButton(self, page, binding, page.mainbar[binding] + page.offset - 1)
     else
-      UpdateOverrideButton(self, frame, binding)
+      UpdateKeyboardBindingActionButton(self, page, binding)
     end
   end
 
   local padding, mmin, mmax = 12, math.min, math.max
-  function _A.UpdateKeyboardLayout(e, frame, layout, ...)
-    frame.index = 0
-    local xmin, xmax = frame:GetLeft(), frame:GetRight()
-    local ymin, ymax = frame:GetBottom(), frame:GetTop()
+  function _A.UpdateKeyboardLayout(e, root, layout, ...)
+    print("UpdateKeyboardLayout", e.key)
+    local page = root.pageKeyboard
+    page.index = 0
+    page:ClearAllPoints()
+    page:SetPoint("TOPLEFT", padding, -padding)
+    page:SetSize(1, 1)
+    local xmin, xmax = page:GetLeft(), page:GetRight()
+    local ymin, ymax = page:GetBottom(), page:GetTop()
     local button
+    for key in pairs(page.buttons) do
+      if type(key) == "string" then
+        page.button[key] = nil
+      end
+    end
     for i = 1, #layout, 3 do
-      frame.index = frame.index + 1
-      if frame.index > #frame.buttons then
-        button = CreateFrame("button", nil, frame, "OBroBindsOverrideButtonTemplate")
+      page.index = page.index + 1
+      if page.index > #page.buttons then
+        button = CreateFrame("button", nil, page, "OBroBindsOverrideButtonTemplate")
         button.Update = Update
-        table.insert(frame.buttons, button)
+        table.insert(page.buttons, button)
       else
-        button = frame.buttons[frame.index]
+        button = page.buttons[page.index]
       end
       local key, x, y = select(i, unpack(layout))
       button.key = key
-      button:SetPoint("TOPLEFT", padding+x, -y-padding-12)
+      page.buttons[key] = button
+      button:SetPoint("TOPLEFT", x, -y-58)
       button.Border:Hide()
       button.Border:SetAlpha(1)
       button.HotKey:SetText(key)
@@ -137,211 +181,99 @@ do
       ymin = mmin(ymin, button:GetBottom())
       ymax = mmax(ymax, button:GetTop())
     end
-    for i = frame.index+1, #frame.buttons do
-      button = frame.buttons[frame.index]
+    for i = page.index+1, #page.buttons do
+      button = page.buttons[page.index]
       button:Hide()
     end
-    local w, h = xmax-xmin+padding, ymax-ymin+padding
-    frame:SetSize(w, h)
-    frame.drawer.scroll.edit:SetSize(frame.drawer.scroll:GetWidth(), h)
-    frame.drawer.scroll.edit.bg = frame.drawer.scroll.edit:CreateTexture(nil, 'BACKGROUND')
-    frame.drawer.scroll.edit.bg:SetAllPoints()
-    frame.drawer.scroll.edit.bg:SetVertexColor(1, 0.5, 0.25, 0.5)
-    frame.drawer.scroll.edit.bg:SetColorTexture(1, 0.5, 0.25, 0.5)
+    local w, h = xmax-xmin, ymax-ymin
+    root:SetSize(w+padding*2, h+padding*2)
+    page:SetSize(w, h)
+    --frame.drawer.scroll.edit:SetSize(frame.drawer.scroll:GetWidth(), h)
+    --frame.drawer.scroll.edit.bg = frame.drawer.scroll.edit:CreateTexture(nil, 'BACKGROUND')
+    --frame.drawer.scroll.edit.bg:SetAllPoints()
+    --frame.drawer.scroll.edit.bg:SetVertexColor(1, 0.5, 0.25, 0.5)
+    --frame.drawer.scroll.edit.bg:SetColorTexture(1, 0.5, 0.25, 0.5)
     --BackdropTemplateMixin.OnBackdropLoaded(self)
     --frame.scroll.edit:SetSize(w-100-2*padding, h)
     --frame.scroll.edit:SetPoint("TOPLEFT", padding, -padding)
     --frame.tmp:ClearAllPoints()
     --frame.tmp:SetAllPoints(frame.scroll)
-    return e:next(frame, ...)
+    return e(root, ...)
   end
-end
-
-function _A.UpdateKeyboardMainbarBindings(e, frame)
-  for key in pairs(frame.mainbar) do
-    frame.mainbar[key] = nil
-  end
-  for index = 1, 12 do
-    local binding = GetBindingKey("ACTIONBUTTON"..index)
-    if binding then
-      frame.mainbar[binding] = index
-      frame:dispatch("DEL_OVERRIDE_ENTRY", true, binding)
-    end
-  end
-  return e:next(frame)
-end
-
-function _A.UpdateKeyboardMainbarSlots(e, frame, slot)
-  if frame.mainbar[slot] then
-    local button = frame.mainbar[slot]
-    local binding = frame.modifier..button.key
-    if binding == GetBindingKey("ACTIONBUTTON"..(slot-frame.offset+1)) then
-      button:Update()
-    end
-  end
-  return e:next(frame, slot)
-end
-
-function _A.UpdateKeyboardButtons(e, frame)
-  for index = 1, frame.index do
-    frame.buttons[index]:Update()
-  end
-  return e:next(frame)
-end
-
-function _A.BindAllOverrideEntries(e, frame)
-  frame.spec = GetSpecialization()
-  ClearOverrideBindings(frame)
-  for binding, action in map(nil, OBroBindsDB, frame.class, frame.spec) do
-    frame:dispatch("SET_OVERRIDE_ENTRY", false, binding, action[1], action[2], action[3], action[4])
-  end
-  return e:next(frame)
-end
-
-function _A.SetOverrideEntry(e, frame, save, binding, kind, id, name, icon, locked)
-  if kind == "SPELL" then
-    SetOverrideBindingSpell(frame, false, binding, GetSpellInfo(id) or name)
-  elseif kind == "MACRO" then
-    SetOverrideBindingMacro(frame, false, binding, name)
-  elseif kind == "ITEM" then
-    SetOverrideBindingItem(frame, false, binding, name)
-  elseif kind == "BLOB" then
-    -- ok
-  end
-  if save then
-    OBroBindsDB = write(OBroBindsDB, frame.class, frame.spec, binding, {kind, id, name, icon, locked})
-  end
-  return e:next(frame, binding, save, kind, id, name, icon, locked)
-end
-
-function _A.GetOverrideEntry(e, frame, binding)
-  local action = read(OBroBindsDB, frame.class, frame.spec, binding)
-  if action then
-    return e:next(frame, binding, action[KIND], action[ID], action[NAME], action[ICON], action[LOCKED])
-  end
-  return e:next(frame, binding, nil)
-end
-
-function _A.DelOverrideEntry(e, frame, save, binding)
-  SetOverrideBinding(frame, false, binding, nil)
-  if save then
-    OBroBindsDB = write(OBroBindsDB, frame.class, frame.spec, binding, nil)
-  end
-  return e:next(frame, binding)
 end
 
 do
-  local function CURSOR_UPDATE(e, frame)
-    frame.__cursor = nil
-    frame:UnregisterEvent("CURSOR_UPDATE")
-    return e:once(frame)
+  local function clean(tbl)
+    for key in pairs(tbl) do
+      tbl[key] = nil
+    end
+    return tbl
   end
-  function _A.PickupOverrideEntry(e, frame, button)
-    local binding = frame.modifier..button.key
-    if not read(OBroBindsDB, frame.class, frame.spec, binding, 5) then
-      if frame.mainbar[binding] then
-        PickupAction(frame.mainbar[binding] + frame.offset - 1)
-        return e:next(frame, button)
-      end
-      local kind, id, name, icon = select(3, frame:dispatch("GET_OVERRIDE_ENTRY", binding))
-      if kind == "SPELL" then
-        PickupSpell(id)
-        if not GetCursorInfo() then
-          local macro = CreateMacro("__OBRO_TMP", select(3, GetSpellInfo(id)) or icon)
-          PickupMacro(macro)
-          DeleteMacro(macro)
-          frame.__cursor = read(OBroBindsDB, frame.class, frame.spec, binding)
-          frame:RegisterEvent("CURSOR_UPDATE")
-          _A.listen("CURSOR_UPDATE", CURSOR_UPDATE)
+  local function UpdateButton(page, binding, msg)
+    local modifier, key = string.match(binding, "(.*[.*-]?)([^-]*.)$")
+    if page.modifier == modifier then
+      page.buttons[key]:Update()
+    end
+  end
+
+  local prev
+  function _A.UpdateKeyboardMainbarIndices(e, root, ...)
+    print("UpdateKeyboardMainbarBindings", e.key, ...)
+    local page = root.pageKeyboard
+    prev, page.mainbar = page.mainbar, clean(prev or {})
+    for index = 1, 12 do
+      local binding = GetBindingKey("ACTIONBUTTON"..index)
+      if binding then
+        page.mainbar[binding] = index
+        if prev then
+          if prev[binding] ~= page.mainbar[binding] then
+            UpdateButton(page, binding, "mod")
+          end
+          prev[binding] = nil
         end
-      elseif kind == "MACRO" then
-        PickupMacro(name)
-      elseif kind == "ITEM" then
-        PickupItem(id)
-      elseif kind then
-        assert(false, "Unhandled pickup: "..kind)
       end
-      frame:dispatch("DEL_OVERRIDE_ENTRY", true, binding)
     end
-    return e:next(frame, button)
+    if prev then
+      for binding in pairs(prev) do
+        UpdateButton(page, binding)
+      end
+    end
+    return e(root, ...)
+  end
+
+  function _A.UpdateKeyboardMainbarSlots(e, root, slot, ...)
+    local page = root.pageKeyboard
+    local index = slot-page.offset+1
+    local binding = GetBindingKey("ACTIONBUTTON"..index)
+    if binding and 1 <= index and index <= 12 then
+      assert(page.mainbar[binding] == index)
+      UpdateButton(page, binding)
+    end
+    return e(root, slot, ...)
+  end
+
+  function _A.UpdateKeyboardMainbarOffsets(e, root, ...)
+    local page = root.pageKeyboard
+    for binding, index in pairs(page.mainbar) do
+      UpdateButton(page, binding)
+    end
+    return e(root, ...)
   end
 end
 
-function _A.ReceiveOverrideEntry(e, frame, button)
-  local binding = frame.modifier..button.key
-  if not read(OBroBindsDB, frame.class, frame.spec, binding, 5) then
-    if frame.mainbar[binding] then
-      PlaceAction(frame.mainbar[binding] + frame.offset - 1)
-      return e:next(frame, button)
-    end
-    local kind, id, link, arg1, arg2 = GetCursorInfo()
-    if kind == "spell" then
-      ClearCursor()
-      frame:dispatch("PICKUP_OVERRIDE_ENTRY", button)
-      local id = arg2 or arg1
-      local name, _, icon = GetSpellInfo(id)
-      assert(id ~= nil, "GetCursorInfo() on spell, id should never be nil")
-      assert(name ~= nil, "GetCursorInfo() on spell, name should never be nil")
-      assert(icon ~= nil, "GetCursorInfo() on spell, icon should never be nil")
-      frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, strupper(kind), id, name, icon)
-    elseif kind == "macro" and id == 0 then
-      local action = frame.__cursor
-      ClearCursor()
-      frame:dispatch("PICKUP_OVERRIDE_ENTRY", button)
-      frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, action[KIND], action[ID], action[NAME], action[ICON])
-    elseif kind == "macro" then
-      ClearCursor()
-      frame:dispatch("PICKUP_OVERRIDE_ENTRY", button)
-      local name, icon = GetMacroInfo(id)
-      assert(id ~= nil, "GetCursorInfo() on macro, id should never be nil")
-      assert(type(id) == "number", "GetCursorInfo() on macro, id should always be number")
-      assert(name ~= nil, "GetCursorInfo() on macro, name should never be nil")
-      assert(icon ~= nil, "GetCursorInfo() on macro, icon should never be nil")
-      frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, strupper(kind), id, name, icon)
-    elseif kind == "item" then
-      ClearCursor()
-      local name = select(3, string.match(link, "^|c%x+|H(%a+):(%d+).+|h%[([^%]]+)"))
-      local icon = select(10, GetItemInfo(id))
-      assert(link ~= nil, "GetCursorInfo() on item, link should never be nil")
-      assert(name ~= nil, "GetCursorInfo() on item, name should never be nil")
-      assert(icon ~= nil, "GetCursorInfo() on item, icon should never be nil")
-      frame:dispatch("PICKUP_OVERRIDE_ENTRY", button)
-      frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, strupper(kind), id, name, icon)
-    elseif kind then
-      assert(false, "Unhandled receive: "..kind)
-    end
+function _A.UpdateKeyboardButtons(e, root, ...)
+  print("UpdateKeyboardButtons", e.key)
+  local page = root.pageKeyboard
+  for index = 1, page.index do
+    page.buttons[index]:Update()
   end
-  return e:next(frame, button)
+  return e(root, ...)
 end
 
-function _A.PromoteOverrideEntry(e, frame, binding)
-  local action = GetBindingAction(binding, false)
-  local kind, name = string.match(action, "^(%w+) (.*)$")
-  if kind == 'SPELL' then
-    local icon, _, _, _, id = select(3, GetSpellInfo(name))
-    assert(name ~= nil)
-    frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, kind, id, name, icon or 134400)
-  elseif kind == 'MACRO' then
-    local id = GetMacroIndexByName(name)
-    local icon = select(2, GetMacroInfo(name))
-    assert(name ~= nil)
-    frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, kind, id, name, icon or 134400)
-  elseif kind == 'ITEM' then
-    local link, _, _, _, _, _, _, _, icon = select(2, GetItemInfo(name))
-    local id = link and select(4, string.find(link, "^|c%x+|H(%a+):(%d+)[|:]"))
-    assert(name ~= nil)
-    frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, kind, id, name, icon or 134400)
-  else
-    assert(false, "Unhandled type: "..kind)
-  end
-  return e:next(frame, binding)
-end
 
-function _A.LockOverrideEntry(e, frame, binding)
-  local value = not read(OBroBindsDB, frame.class, frame.spec, binding, 5) and true or nil
-  OBroBindsDB = write(OBroBindsDB, frame.class, frame.spec, binding, 5, value)
-  return e:next(frame, binding)
-end
+
+
+
 
 
 do
@@ -395,7 +327,7 @@ end
 
 do
   local function RemoveOverride(self, button, binding)
-    button:GetParent():dispatch("DEL_OVERRIDE_ENTRY", true, binding)
+    button:GetParent():dispatch("ADDON_DEL_OVERRIDE_BINDING", binding)
     button:Update()
     CloseDropDownMenus()
   end
@@ -542,3 +474,4 @@ function _A.UpdateUnknownSpells(e, frame)
   end
   return e:next(frame)
 end
+

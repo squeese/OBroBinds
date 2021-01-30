@@ -14,32 +14,53 @@
       </OnClick>
     </Scripts>
   </Button>
-  <Frame name="OBroBindsPageTemplate" inherits="BackdropTemplate" parentArray="Pages" hidden="true" virtual="true">
+
+  <Frame name="OBroBindsPageTemplate" parentArray="Pages" hidden="true" virtual="true">
     <Anchors>
       <Anchor point="TOPLEFT" />
       <Anchor point="BOTTOMRIGHT" />
     </Anchors>
     <Scripts>
-      <OnLoad>
-        BackdropTemplateMixin.OnBackdropLoaded(self)
-      </OnLoad>
       <OnShow>
-        self:GetParent():dispatch("PAGE_"..self.name.."_SHOW")
+        self:dispatch("ADDON_PAGE_"..self.name.."_SHOW")
       </OnShow>
       <OnHide>
-        self:GetParent():dispatch("PAGE_"..self.name.."_HIDE")
+        self:dispatch("ADDON_PAGE_"..self.name.."_HIDE")
       </OnHide>
     </Scripts>
   </Frame>
+
   <Frame name="OBroBindsRootFrame" movable="true" parent="UIParent" hidden="true" inherits="UIPanelDialogTemplate">
     <Size>
-      <AbsDimension x="400" y="400" />
+      <AbsDimension x="800" y="800" />
     </Size>
     <Anchors>
       <Anchor point="CENTER" />
     </Anchors>
+    <Scripts>
+      <OnLoad>
+        self.numTabs = #self.Tabs
+        self.Title:SetText("OBroBinds")
+        function _G.OBroBinds_Toggle()
+          if self:IsVisible() then
+            self:Hide()
+          else
+            self:Show()
+          end
+        end
+      </OnLoad>
+      <OnShow>
+        self:dispatch("ADDON_ROOT_SHOW")
+      </OnShow>
+      <OnHide>
+        self:dispatch("ADDON_ROOT_HIDE")
+      </OnHide>
+      <OnEvent>
+        self:dispatch(event, ...)
+      </OnEvent>
+    </Scripts>
     <Frames>
-      <Button name="$parentTabKeyboard" inherits="OBroBindsTabTemplate">
+      <Button parentKey="tabKeyboard" name="$parentTabKeyboard" inherits="OBroBindsTabTemplate">
         <KeyValues>
           <KeyValue key="index" value="1" type="number" />
           <KeyValue key="title" value="Keyboard" type="string" />
@@ -48,7 +69,7 @@
           <Anchor point="TOPLEFT" relativeTo="$parent" relativePoint="BOTTOMLEFT" x="16" y="8" />
         </Anchors>
       </Button>
-      <Button name="$parentTabSettings" inherits="OBroBindsTabTemplate">
+      <Button parentKey="tabSettings" name="$parentTabSettings" inherits="OBroBindsTabTemplate">
         <KeyValues>
           <KeyValue key="index" value="2" type="number" />
           <KeyValue key="title" value="Settings" type="string" />
@@ -57,7 +78,7 @@
           <Anchor point="LEFT" relativeTo="$parentTabKeyboard" relativePoint="RIGHT" x="-12" y="0" />
         </Anchors>
       </Button>
-      <Frame inherits="OBroBindsPageTemplate">
+      <Frame parentKey="pageKeyboard" inherits="OBroBindsPageTemplate">
         <KeyValues>
           <KeyValue key="name" value="KEYBOARD" type="string" />
           <KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_16_16_5555" type="global"/>
@@ -65,7 +86,7 @@
           <KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
         </KeyValues>
       </Frame>
-      <Frame inherits="OBroBindsPageTemplate">
+      <Frame parentKey="pageSettings" inherits="OBroBindsPageTemplate">
         <KeyValues>
           <KeyValue key="name" value="SETTINGS" type="string" />
           <KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_16_16_5555" type="global"/>
@@ -74,19 +95,69 @@
         </KeyValues>
       </Frame>
     </Frames>
+  </Frame>
+
+  <Button name="OBroBindsStanceButtonTemplate" inherits="ActionButtonTemplate" virtual="true">
     <Scripts>
       <OnLoad>
-        self.numTabs = #self.Tabs
-        self.Title:SetText("OBroBinds")
+        self:RegisterForClicks("AnyUp")
       </OnLoad>
-      <OnShow>
-        self:dispatch("ROOT_SHOW")
-      </OnShow>
-      <OnHide>
-        self:dispatch("ROOT_HIDE")
-      </OnHide>
+      <OnClick>
+        local page = self:GetParent()
+        page.offset = self.offset ~= page.offset and self.offset or 1
+        page:dispatch("ADDON_OFFSET_CHANGED")
+      </OnClick>
     </Scripts>
-  </Frame>
+  </Button>
+
+  <Button name="OBroBindsOverrideButtonTemplate" inherits="ActionButtonTemplate" virtual="true">
+    <Scripts>
+      <OnLoad>
+        self:RegisterForDrag("LeftButton")
+        self:RegisterForClicks("AnyUp")
+        self.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+        self.AutoCastable:SetTexCoord(0.15, 0.6, 0.6, 0.15)
+        self.AutoCastable:ClearAllPoints()
+        self.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
+        self.AutoCastable:SetScale(0.4)
+        self.AutoCastable:SetAlpha(0.75)
+      </OnLoad>
+      <OnEnter>
+        self:GetParent():dispatch("SHOW_TOOLTIP", self)
+      </OnEnter>
+      <OnLeave>
+        GameTooltip:Hide()
+      </OnLeave>
+      <OnDragStart>
+        if InCombatLockdown() then return end
+        self:GetParent():dispatch("PICKUP_OVERRIDE_ENTRY", self)
+        self:Update()
+      </OnDragStart>
+      <OnReceiveDrag>
+        if InCombatLockdown() then return end
+        self:GetParent():dispatch("RECEIVE_OVERRIDE_ENTRY", self)
+        self:Update()
+      </OnReceiveDrag>
+      <OnClick>
+        if InCombatLockdown() then return end
+        if button == "RightButton" then
+          local page = self:GetParent()
+          local binding = page.modifier..self.key
+          if not page.mainbar[binding] then
+            page:dispatch("SHOW_DROPDOWN", self)
+          end
+        elseif GetCursorInfo() then
+          self:GetParent():dispatch("RECEIVE_OVERRIDE_ENTRY", self)
+          self:Update()
+        end
+      </OnClick>
+    </Scripts>
+  </Button>
+  <Script file="deps/utils.funcs.lua" />
+  <Script file="deps/utils.binding.lua" />
+  <Script file="deps/layouts.lua" />
+  <Script file="deps/handlers.lua" />
+  <Script file="OBroBinds.lua" />
 
 
 
@@ -220,64 +291,5 @@
       </Frame>
     </Frames>
   </Frame>
-  <Button name="OBroBindsStanceButtonTemplate" inherits="ActionButtonTemplate" virtual="true">
-    <Scripts>
-      <OnLoad>
-        self:RegisterForClicks("AnyUp")
-      </OnLoad>
-      <OnClick>
-        local frame = self:GetParent()
-        frame.offset = self.offset ~= frame.offset and self.offset or 1
-        frame:dispatch("OFFSET_CHANGED")
-      </OnClick>
-    </Scripts>
-  </Button>
-  <Button name="OBroBindsOverrideButtonTemplate" inherits="ActionButtonTemplate" virtual="true">
-    <Scripts>
-      <OnLoad>
-        self:RegisterForDrag("LeftButton")
-        self:RegisterForClicks("AnyUp")
-        self.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
-        self.AutoCastable:SetTexCoord(0.15, 0.6, 0.6, 0.15)
-        self.AutoCastable:ClearAllPoints()
-        self.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
-        self.AutoCastable:SetScale(0.4)
-        self.AutoCastable:SetAlpha(0.75)
-      </OnLoad>
-      <OnEnter>
-        self:GetParent():dispatch("SHOW_TOOLTIP", self)
-      </OnEnter>
-      <OnLeave>
-        GameTooltip:Hide()
-      </OnLeave>
-      <OnDragStart>
-        if InCombatLockdown() then return end
-        self:GetParent():dispatch("PICKUP_OVERRIDE_ENTRY", self)
-        self:Update()
-      </OnDragStart>
-      <OnReceiveDrag>
-        if InCombatLockdown() then return end
-        self:GetParent():dispatch("RECEIVE_OVERRIDE_ENTRY", self)
-        self:Update()
-      </OnReceiveDrag>
-      <OnClick>
-        if InCombatLockdown() then return end
-        if button == "RightButton" then
-          local frame = self:GetParent()
-          local binding = frame.modifier..self.key
-          if not frame.mainbar[binding] then
-            frame:dispatch("SHOW_DROPDOWN", self)
-          end
-        elseif GetCursorInfo() then
-          self:GetParent():dispatch("RECEIVE_OVERRIDE_ENTRY", self)
-          self:Update()
-        end
-      </OnClick>
-    </Scripts>
-  </Button>
   -->
-  <Script file="deps/utilities.lua" />
-  <Script file="deps/layouts.lua" />
-  <Script file="deps/handlers.lua" />
-  <Script file="OBroBinds.lua" />
 </Ui>

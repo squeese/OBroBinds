@@ -43,19 +43,11 @@ local function map(iter, ...)
 end
 _A.map = map
 
-
-local POOL = {}
 local function write(tbl, key, ...)
   if not tbl then
-    local tbl = tremove(POOL) or {}
-    print("GET", tbl)
-    return write(tbl, key, ...)
+    return write({}, key, ...)
   elseif type(key) == 'function' then
-    local before = tbl
     tbl = key(tbl, ...)
-    if before ~= tbl then
-      print("WTF", before)
-    end
   elseif select("#", ...) > 0 then
     tbl[key] = write(tbl[key], ...)
   else
@@ -67,15 +59,8 @@ local function write(tbl, key, ...)
   for _ in pairs(tbl) do
     return tbl
   end
-  print("RELEASE", tbl)
-  tinsert(POOL, tbl)
   return nil
 end
-
-local t
-t = write(t, "one", "two", 3)
-t = write(t, "one", nil)
-
 _A.write = write
 
 local function next(fn, ...)
