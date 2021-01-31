@@ -205,6 +205,7 @@ do
         _A.listen(key, self)
         shift(self, self.fold, event.key)
       end
+      print("FOLD", key)
       return event(...)
     end
     function STACK.fold(self, key, ...)
