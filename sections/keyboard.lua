@@ -53,12 +53,12 @@ do
   end
   local function OnDragStart(self)
     if InCombatLockdown() then return end
-    scope:dispatch("ADDON_PICKUP_OVERRIDE_BINDING", self)
+    scope.PickupAction(self.binding)
     self:UpdateButton()
   end
   local function OnReceiveDrag(self)
     if InCombatLockdown() then return end
-    scope:dispatch("ADDON_RECEIVE_OVERRIDE_BINDING", self)
+    scope.ReceiveAction(self.binding)
     self:UpdateButton()
   end
   local function OnClick(self, button)
@@ -69,7 +69,7 @@ do
         scope:dispatch("ADDON_SHOW_DROPDOWN", self)
       end
     elseif GetCursorInfo() then
-      scope:dispatch("ADDON_RECEIVE_OVERRIDE_BINDING", self)
+      scope.ReceiveAction(self.binding)
       self:UpdateButton()
     end
   end
@@ -95,6 +95,7 @@ end
 do
   local function UpdateButton(self)
     local binding = scope.modifier..self.key
+    self.binding = binding
     if scope.mainbar[binding] then
       local kind, id = GetActionInfo(scope.mainbar[binding] + scope.offset - 1)
       self.Border:Show()
@@ -288,96 +289,6 @@ function scope.UpdateAllKeyboardButtons(e, ...)
 end
 
 do
-  --local function CURSOR_UPDATE(e, frame)
-    --frame.__cursor = nil
-    --frame:UnregisterEvent("CURSOR_UPDATE")
-    --return e:once(frame)
-  --end
-  function scope.PickupOverrideBinding(e, button, ...)
-    local binding = scope.modifier..button.key
-    if scope.mainbar[binding] then
-      PickupAction(scope.mainbar[binding] + scope.offset - 1)
-      return e(button, ...)
-    end
-    local action = scope.GetAction(binding)
-    if not action.locked then
-      if action.SPELL then
-        PickupSpell(action.id)
-        --if not GetCursorInfo() then
-          --local macro = CreateMacro("__OBRO_TMP", select(3, GetSpellInfo(id)) or icon)
-          --PickupMacro(macro)
-          --DeleteMacro(macro)
-          --root.__cursor = read(OBroBindsDB, root.class, root.spec, binding)
-          --root:RegisterEvent("CURSOR_UPDATE")
-          --_A.listen("CURSOR_UPDATE", CURSOR_UPDATE)
-        --end
-      elseif action.MACRO then
-        PickupMacro(action.name)
-      elseif action.ITEM then
-        PickupItem(action.id)
-      elseif action.kind then
-        assert(false, "Unhandled pickup: "..action.kind)
-      end
-      scope.DeleteAction(binding)
-    end
-    return e(button, ...)
-  end
-end
-
-function scope.ReceiveOverrideBinding(e, button, ...)
-  local binding = scope.modifier..button.key
-  if scope.mainbar[binding] then
-    PlaceAction(scope.mainbar[binding] + scope.offset - 1)
-    return e(button, ...)
-  end
-
-  if not scope.GetAction(binding).locked then
-    local kind, id, link, arg1, arg2 = GetCursorInfo()
-
-    if kind == "spell" then
-      ClearCursor()
-      scope:dispatch("ADDON_PICKUP_OVERRIDE_BINDING", button)
-      local id = arg2 or arg1
-      local name, _, icon = GetSpellInfo(id)
-      assert(id ~= nil)
-      assert(name ~= nil)
-      assert(icon ~= nil)
-      scope.SaveAction(binding, strupper(kind), id, name, icon)
-
-    --elseif kind == "macro" and id == 0 then
-      --local action = root.__cursor
-      --ClearCursor()
-      --root:dispatch("PICKUP_OVERRIDE_ENTRY", button)
-      --root:dispatch("SET_OVERRIDE_ENTRY", true, binding, action[KIND], action[ID], action[NAME], action[ICON])
-
-    elseif kind == "macro" then
-      ClearCursor()
-      scope:dispatch("ADDON_PICKUP_OVERRIDE_BINDING", button)
-      local name, icon = GetMacroInfo(id)
-      assert(type(id) == "number")
-      assert(id ~= nil)
-      assert(name ~= nil)
-      assert(icon ~= nil)
-      scope.SaveAction(binding, strupper(kind), id, name, icon)
-
-    elseif kind == "item" then
-      ClearCursor()
-      local name = select(3, string.match(link, "^|c%x+|H(%a+):(%d+).+|h%[([^%]]+)"))
-      local icon = select(10, GetItemInfo(id))
-      assert(link ~= nil)
-      assert(name ~= nil)
-      assert(icon ~= nil)
-      scope:dispatch("ADDON_PICKUP_OVERRIDE_BINDING", button)
-      scope.SaveAction(binding, strupper(kind), id, name, icon)
-
-    elseif kind then
-      assert(false, "Unhandled receive: "..kind)
-    end
-  end
-  return next(button)
-end
-
-do
   local function Update(button)
     if not button:IsVisible() then return end
     GameTooltip:SetOwner(button, 'ANCHOR_BOTTOMRIGHT')
@@ -439,7 +350,7 @@ end
 do
   local function RemoveOverride(self, button, binding)
     scope.DeleteAction(binding)
-    button:UpdateButton()
+    --button:UpdateButton()
     CloseDropDownMenus()
   end
   local function RemoveBinding(self, button, binding)
@@ -452,21 +363,22 @@ do
     scope.PromoteToAction(binding)
     SetBinding(binding, nil)
     SaveBindings(GetCurrentBindingSet())
-    button:UpdateButton()
+    --button:UpdateButton()
     CloseDropDownMenus()
   end
   local function LockBinding(self, button, binding)
     scope.ToggleActionLock(binding)
-    button:UpdateButton()
+    --button:UpdateButton()
     CloseDropDownMenus()
   end
   local function CreateBlob(self, button, binding)
-    scope.SaveAction(binding, "BLOB", "noname", "/cast Fade", 3615513)
-    button:UpdateButton()
+    scope.SaveAction(binding, "BLOB", binding, "", 3615513)
+    --button:UpdateButton()
     CloseDropDownMenus()
   end
   local function EditBlob(self, button, binding)
-    scope:dispatch("ADDON_EDIT_BLOB", binding)
+    scope:dispatch("ADDON_EDITOR_SHOW")
+    scope:dispatch("ADDON_EDITOR_SELECT", binding)
     CloseDropDownMenus()
   end
 
@@ -495,16 +407,34 @@ do
       UIDropDownMenu_AddButton(info, 1)
 
       reset()
-      info.text = not action.kind and 'none' or action.kind.." "..action.name
-      info.hasArrow = not action.locked
+      if not action.kind then
+        info.text = 'none'
+      elseif action.BLOB then
+        info.text = action.id
+      else
+        info.text = action.kind.." "..action.name
+      end
+      info.hasArrow = action.kind and not action.locked
       info.menuList = "override"
-      info.disabled = action.locked
+      info.disabled = not action.kind or action.locked
       UIDropDownMenu_AddButton(info, 1)
-      UIDropDownMenu_AddSeparator(1)
+
+      if action.BLOB then
+        reset()
+        info.text = "Edit blob"
+        info.func = EditBlob
+        UIDropDownMenu_AddButton(info, 1)
+      elseif not action.kind then
+        reset()
+        info.text = "Create blob"
+        info.func = CreateBlob
+        UIDropDownMenu_AddButton(info, 1)
+      end
 
       reset()
       info.text = "Binding"
       info.isTitle = true
+      UIDropDownMenu_AddSeparator(1)
       UIDropDownMenu_AddButton(info, 1)
 
       reset()
@@ -519,27 +449,16 @@ do
       info.notCheckable = false
       info.checked = action.locked
       info.func = LockBinding
+      UIDropDownMenu_AddSeparator(1)
       UIDropDownMenu_AddButton(info, 1)
 
     elseif section == "override" then
       local action = scope.GetAction(binding)
 
-      if action.BLOB then
-        reset()
-        info.text = "Edit blob"
-        info.func = EditBlob
-        UIDropDownMenu_AddButton(info, 2)
-      end
-
       if action.kind then
         reset()
         info.text = "Clear override"
         info.func = RemoveOverride
-        UIDropDownMenu_AddButton(info, 2)
-      else
-        reset()
-        info.text = "Create blob"
-        info.func = CreateBlob
         UIDropDownMenu_AddButton(info, 2)
       end
 
@@ -550,6 +469,12 @@ do
         reset()
         info.text = "Promote to override"
         info.func = PromoteBinding
+        UIDropDownMenu_AddButton(info, 2)
+      end
+      if kind == 'MACRO' then
+        reset()
+        info.text = "Import to blob"
+        info.func = scope.ImportMacroToAction
         UIDropDownMenu_AddButton(info, 2)
       end
       reset()

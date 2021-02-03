@@ -2,95 +2,68 @@
   <Script file="deps\utils.misc.lua" />
   <Script file="deps\utils.action.lua" />
   <Script file="deps\layouts.lua" />
-  <Include file="sections\root.xml" />
-  <Include file="sections\keyboard.xml" />
-  <Include file="sections\selector.xml" />
-  <Script file="OBroBinds.lua" />
+  <Script file="sections\root.lua" />
+  <Script file="sections\keyboard.lua" />
+  <Script file="sections\editor.lua" />
 
   <!--
-  <Script file="deps/mixins.lua" />
-  <Script file="deps/layouts.lua" />
-  <Script file="deps/handlers.lua" />
-  <Script file="deps/dropdown.lua" />
-
-  <Frame name="OBroBindsRootTemplate" mixin="OBroBindsMixin" hidden="true" virtual="true" movable="true">
+  <Script file="sections\selector.lua" />
+  <Button name="OBroBindsLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTextTemplate" virtual="true">
     <Size>
-      <AbsDimension x="320" y="240" />
+      <AbsDimension y="28" />
     </Size>
-    <Anchors>
-      <Anchor point="CENTER" />
-    </Anchors>
     <Scripts>
-      <OnEvent method="OnEvent" />
-      <OnShow method="OnShow" />
-      <OnHide method="OnHide" />
+      <OnDragStart method="OnDragStart" />
+    </Scripts>
+    <Layers>
+      <Layer level="BACKGROUND">
+        <FontString parentKey="Upper" inherits="GameFontNormalSmall" justifyH="LEFT" maxLines="1">
+          <Anchors>
+            <Anchor point="LEFT" x="36" />
+            <Anchor point="RIGHT" x="-32" />
+          </Anchors>
+        </FontString>
+        <Texture parentKey="Icon" />
+      </Layer>
+    </Layers>
+  </Button>
+  <Frame name="OBroBindsListTemplate" mixin="OBroBindsListMixin" inherits="ScrollListTemplate" virtual="true">
+    <Scripts>
+      <OnLoad method="OnLoad" />
+    </Scripts>
+  </Frame>
+  -->
+
+  <Button name="OBroBindsLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTemplate" virtual="true">
+    <Size>
+      <AbsDimension y="40" />
+    </Size>
+    <Frames>
+      <Button parentArray="Icons" inherits="ActionButtonTemplate" />
+      <Button parentArray="Icons" inherits="ActionButtonTemplate" />
+      <Button parentArray="Icons" inherits="ActionButtonTemplate" />
+      <Button parentArray="Icons" inherits="ActionButtonTemplate" />
+      <Button parentArray="Icons" inherits="ActionButtonTemplate" />
+    </Frames>
+  </Button>
+
+  <Frame name="OBroBindsListTemplate" mixin="OBroBindsListMixin" inherits="ScrollListTemplate" virtual="true">
+    <Scripts>
       <OnLoad method="OnLoad" />
     </Scripts>
   </Frame>
 
-  <Frame name="OBroBindsPanelTemplate" mixin="OBroBindsMixin" inherits="UIPanelDialogTemplate" virtual="true" enableMouse="true">
+  <ScrollFrame name="OBroBindsEditorTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
     <Anchors>
-      <Anchor point="TOPLEFT" />
-      <Anchor point="BOTTOMRIGHT" />
+      <Anchor point="TOPLEFT" x="18" y="-68" />
+      <Anchor point="BOTTOMRIGHT" x="-36" y="52" />
     </Anchors>
-    <Scripts>
-      <OnDragStart method="OnDragStart" />
-      <OnDragStop method="OnDragStop" />
-    </Scripts>
-  </Frame>
-
-  <Button name="OBroBindsTabsTemplate" mixin="OBroBindsMixin" inherits="CharacterFrameTabButtonTemplate" parentArray="Tabs" virtual="true">
-    <Scripts>
-      <OnClick method="OnClick" />
-    </Scripts>
-  </Button>
-
-  <Frame name="OBroBindsPageTemplate" mixin="OBroBindsMixin" parentArray="Pages" hidden="true" virtual="true">
-    <Anchors>
-      <Anchor point="TOPLEFT" />
-      <Anchor point="BOTTOMRIGHT" />
-    </Anchors>
-    <Scripts>
-      <OnShow method="OnShow" />
-      <OnHide method="OnHide" />
-    </Scripts>
-  </Frame>
-
-  <Button name="OBroBindsStanceButtonTemplate" mixin="OBroBindsMixin" inherits="ActionButtonTemplate" virtual="true">
-    <Scripts>
-      <OnClick method="OnClick" />
-    </Scripts>
-  </Button>
-
-  <Button name="OBroBindsActionButtonTemplate" mixin="OBroBindsMixin" inherits="ActionButtonTemplate" virtual="true">
-    <Scripts>
-      <OnEnter method="OnEnter" />
-      <OnLeave method="OnLeave" />
-      <OnDragStart method="OnDragStart" />
-      <OnReceiveDrag method="OnReceiveDrag" />
-      <OnClick method="OnClick" />
-    </Scripts>
-  </Button>
-
-  <ScrollFrame name="OBroBindsScrollTemplate" inherits="UIPanelScrollFrameTemplate,BackdropTemplate" virtual="true">
-    <Anchors>
-      <Anchor point="TOPLEFT" x="18" y="-36" />
-      <Anchor point="BOTTOMRIGHT" x="-18" y="18" />
-    </Anchors>
-    <KeyValues>
-      <KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_16_16_5555" type="global"/>
-      <KeyValue key="backdropColor" value="TOOLTIP_DEFAULT_BACKGROUND_COLOR" type="global"/>
-      <KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
-    </KeyValues>
     <ScrollChild>
       <EditBox parentKey="edit" multiLine="true" autoFocus="false">
         <Scripts>
           <OnLoad>
             ScrollingEdit_OnCursorChanged(self, 0, 0, 0, 0)
           </OnLoad>
-          <OnTextChanged>
-            ScrollingEdit_OnTextChanged(self, self:GetParent())
-          </OnTextChanged>
           <OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
           <OnUpdate>
             ScrollingEdit_OnUpdate(self, elapsed, self:GetParent())
@@ -109,32 +82,5 @@
     </Scripts>
   </ScrollFrame>
 
-  <Button name="OLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTextTemplate" virtual="true">
-    <Size>
-      <AbsDimension y="28" />
-    </Size>
-    <Scripts>
-      <OnDragStart method="OnDragStart" />
-      <OnReceiveDrag method="OnReceiveDrag" />
-    </Scripts>
-    <Layers>
-      <Layer level="BACKGROUND">
-        <FontString parentKey="TextMiddle" inherits="GameFontHighlightSmall" justifyH="LEFT" maxLines="1">
-          <Anchors>
-            <Anchor point="LEFT" x="32" />
-            <Anchor point="RIGHT" x="-32" />
-          </Anchors>
-        </FontString>
-        <Texture parentKey="Icon" />
-      </Layer>
-    </Layers>
-  </Button>
-
-  <Frame name="OListTemplate" mixin="OBroBindsListMixin" inherits="ScrollListTemplate" virtual="true">
-    <Scripts>
-      <OnLoad method="OnLoad" />
-    </Scripts>
-  </Frame>
-  -->
-
+  <Script file="OBroBinds.lua" />
 </Ui>

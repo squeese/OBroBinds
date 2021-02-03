@@ -6,27 +6,40 @@ scope.enqueue("PLAYER_LOGIN", setmetatable({
   scope.STACK.call, scope.UpdatePlayerBindings,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED", scope.UpdatePlayerBindings,
   scope.STACK.init, function(e, ...)
-    scope.root[scope.dbRead('GUI', 'open') and 'Show' or 'Hide'](scope.root)
-    return e(...)
-  end,
-}, scope.STACK))
-
-scope.enqueue("ADDON_ROOT_SHOW", setmetatable({
-  scope.STACK.fold, "ADDON_ROOT_HIDE",
-  scope.STACK.init, scope.CreatePanelFrame,
-  scope.STACK.both, function(e, ...)
-    if e.key == "ADDON_ROOT_SHOW" then
-      scope.dbWrite('GUI', 'open', true)
-    else
-      scope.dbWrite('GUI', 'open', nil)
+    if scope.dbRead("GUI", "open") then
+      scope:dispatch("ADDON_ROOT_SHOW")
     end
     return e(...)
   end,
 }, scope.STACK))
 
+local MACRO_ICON_FILENAMES = {}
+
+scope.enqueue("ADDON_ROOT_SHOW", setmetatable({
+  scope.STACK.fold, "ADDON_ROOT_HIDE",
+  scope.STACK.init, scope.CreatePanelFrame,
+  scope.STACK.init, function(e, ...)
+    scope:dispatch("ADDON_KEYBOARD_SHOW")
+    scope:dispatch("ADDON_EDITOR_SHOW")
+    scope:dispatch("ADDON_EDITOR_SELECT", "A")
+    --scope:dispatch("ADDON_SELECTOR_SHOW")
+    --GetMacroIcons(MACRO_ICON_FILENAMES)
+    --print(#MACRO_ICON_FILENAMES)
+    --for i = 1, 32 do
+      --print(i, MACRO_ICON_FILENAMES[i])
+    --end
+    return e(...)
+  end,
+  scope.STACK.call, scope.STACK.apply(scope.root, scope.root.Show),
+  scope.STACK.undo, scope.STACK.apply(scope.root, scope.root.Hide),
+}, scope.STACK))
+
 
 scope.enqueue("ADDON_KEYBOARD_SHOW", setmetatable({
   scope.STACK.fold, "ADDON_KEYBOARD_HIDE",
+  scope.STACK.call, scope.STACK.apply(scope, scope.dispatch, "ADDON_EDITOR_HIDE"),
+  scope.STACK.call, scope.STACK.apply(scope, scope.read, "keyboard", scope.root.Show),
+  scope.STACK.undo, scope.STACK.apply(scope, scope.read, "keyboard", scope.root.Hide),
   scope.STACK.init, scope.InitializePageKeyboard,
   scope.STACK.init, scope.UpdateKeyboardLayout,
   scope.STACK.call, scope.UpdateKeyboardStanceButtons,
@@ -42,8 +55,6 @@ scope.enqueue("ADDON_KEYBOARD_SHOW", setmetatable({
   scope.STACK.enqueue, "ADDON_PLAYER_TALENT_UPDATE",     scope.UpdateAllKeyboardButtons,
   scope.STACK.enqueue, "ADDON_UPDATE_MACROS",            scope.UpdateAllKeyboardButtons,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED",  scope.UpdateAllKeyboardButtons,
-  scope.STACK.enqueue, "ADDON_PICKUP_OVERRIDE_BINDING",  scope.PickupOverrideBinding,
-  scope.STACK.enqueue, "ADDON_RECEIVE_OVERRIDE_BINDING", scope.ReceiveOverrideBinding,
   scope.STACK.enqueue, "ADDON_SHOW_TOOLTIP",             scope.UpdateTooltip,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED",  scope.RefreshTooltip,
   scope.STACK.enqueue, "ADDON_MODIFIER_CHANGED",         scope.RefreshTooltip,
@@ -53,50 +64,37 @@ scope.enqueue("ADDON_KEYBOARD_SHOW", setmetatable({
   scope.STACK.enqueue, "PLAYER_TALENT_UPDATE",           scope.UpdateUnknownSpells,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED",  scope.UpdateUnknownSpells,
   scope.STACK.enqueue, "ADDON_SHOW_DROPDOWN",            scope.UpdateDropdown,
+  scope.STACK.enqueue, "ADDON_BINDING_UPDATED", function(e, binding, ...)
+    local modifier, key = string.match(binding, "^(.--?)([^-]*.)$")
+    if scope.modifier == modifier then
+      scope.buttons[key]:UpdateButton()
+    end
+    return e(binding, ...)
+  end,
 }, scope.STACK))
 
 --scope.enqueue("ADDON_SELECTOR_SHOW", setmetatable({
   --scope.STACK.fold, "ADDON_SELECTOR_HIDE",
+  --scope.STACK.call, scope.STACK.apply(scope, scope.read, "selector", scope.root.Show),
+  --scope.STACK.undo, scope.STACK.apply(scope, scope.read, "selector", scope.root.Hide),
   --scope.STACK.init, scope.InitializeSelector,
-  --scope.STACK.call, function(e, ...)
-    --print(e.key)
-    --return e(...)
-  --end,
+  --scope.STACK.call, scope.UpdateSelectorList,
+  --scope.STACK.enqueue, "ADDON_BINDING_UPDATED", scope.UpdateSelectorList,
 --}, scope.STACK))
 
---[[
-scope.enqueue("ADDON_PAGE_SETTINGS_SHOW", setmetatable({
-  scope.STACK.fold, "ADDON_PAGE_SETTINGS_HIDE",
-  scope.STACK.init, scope.createEditbox,
-  scope.STACK.call, function(e, ...)
-    print("hello?")
-    --scope.dbWrite("GUI", "page", scope.tabSettings:GetID())
-    return e(...)
-  end,
+scope.enqueue("ADDON_EDITOR_SHOW", setmetatable({
+  scope.STACK.fold, "ADDON_EDITOR_HIDE",
+  scope.STACK.call, scope.STACK.apply(scope, scope.dispatch, "ADDON_KEYBOARD_HIDE"),
+  scope.STACK.call, scope.STACK.apply(scope, scope.read, "editor", scope.root.Show),
+  scope.STACK.undo, scope.STACK.apply(scope, scope.read, "editor", scope.root.Hide),
+  scope.STACK.undo, scope.EditorCleanup,
+  scope.STACK.init, scope.InitializeEditor,
+  scope.STACK.enqueue, "ADDON_EDITOR_SELECT",       scope.EditorSelect,
+  scope.STACK.enqueue, "ADDON_EDITOR_BODY_CHANGED", scope.EditorUpdateButtons,
+  scope.STACK.enqueue, "ADDON_EDITOR_NAME_CHANGED", scope.EditorUpdateButtons,
+  scope.STACK.enqueue, "ADDON_EDITOR_SAVE",         scope.EditorSave,
+  scope.STACK.enqueue, "ADDON_EDITOR_UNDO",         scope.EditorUndo,
 }, scope.STACK))
 
-scope.enqueue("ADDON_EDIT_BLOB", setmetatable({
-  scope.STACK.fold, "ADDON_EDIT_DONE",
-  scope.STACK.call, function(e, binding, ...)
-    print("before pageKeyboard:Hide()")
-    scope.pageKeyboard:Hide()
-    print("after pageKeyboard:Hide()")
 
-    print("before pageSettings:Show()")
-    scope.pageSettings:Show()
-    print("after pageSettings:Hide()")
-    --local action = scope.dbGetAction(binding)
-    --scope.editBox:SetText(action.name)
-    --scope.editBox:SetScript("OnEditFocusLost", function(self)
-      --print("??", binding, self:GetText())
-      --scope.dbWrite(scope.class, scope.spec, binding, scope.ACTION.name, self:GetText())
-    --end)
-    --scope.editBox:SetFocus()
-    return e(...)
-  end,
-  scope.STACK.call, function(e, ...)
-    print("hello!")
-    return e(...)
-  end,
-}, scope.STACK))
-]]
+

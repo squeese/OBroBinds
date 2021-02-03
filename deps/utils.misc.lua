@@ -12,6 +12,9 @@ end
 function scope.read(tbl, key, ...)
   if not tbl then return nil end
   if not key then return tbl end
+  if type(key) == 'function' then
+    return key(tbl, ...)
+  end
   return scope.read(tbl[key], ...)
 end
 
@@ -156,6 +159,9 @@ do
   function scope.STACK.call(self, fn, ...)
     return call(fn, scope.next(scope.shift(self, skip, self.call, fn), ...))
   end
+  function scope.STACK.undo(self, fn, ...)
+    return scope.next(scope.shift(self, self.call, fn), ...)
+  end
   function scope.STACK.init(self, fn, ...)
     return call(fn, scope.next(self, ...))
   end
@@ -170,4 +176,15 @@ end
 function scope.STACK.enqueue(self, event, fn, ...)
   scope.enqueue(event, fn)
   return scope.next(scope.shift(self, self.dequeue, event, fn), ...)
+end
+
+do
+  local mt = {}
+  function mt:__call(e, ...)
+    scope.next(SafeUnpack(self))
+    return e(...)
+  end
+  function scope.STACK.apply(...)
+    return setmetatable(SafePack(...), mt)
+  end
 end
