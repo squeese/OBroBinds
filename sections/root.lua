@@ -8,52 +8,76 @@ local function OnHide(self)
   scope:dispatch(self.NAME .. "_HIDE")
 end
 
-do
-  OBroBindsRootMixin = {}
-  OBroBindsRootMixin.NAME = "ADDON_ROOT"
-  OBroBindsRootMixin.OnEvent = scope.dispatch
-  OBroBindsRootMixin.OnShow = OnShow
-  OBroBindsRootMixin.OnHide = OnHide
-  function OBroBindsRootMixin:OnLoad()
-    function _G.OBroBinds_Toggle()
-      self[self:IsVisible() and 'Hide' or 'Show'](self)
-    end
+function scope.CreateRootFrame()
+  -- movable true
+  scope.root = CreateFrame("frame", "OBroBindsRoot", UIParent, nil)
+  scope.root:Hide()
+  scope.root.NAME = "ADDON_ROOT"
+  scope.root:SetScript("OnShow", OnShow)
+  scope.root:SetScript("OnHide", OnHide)
+  scope.root:SetScript("OnEvent", scope.dispatch)
+  function _G.OBroBinds_Toggle()
+    scope.root[scope.root:IsVisible() and 'Hide' or 'Show'](scope.root)
   end
-  function scope.CreateRootFrame()
-    scope.root = CreateFrame("frame", "OBroBindsRoot", UIParent, "OBroBindsRootTemplate")
-    OBroBindsRootMixin = nil
-    scope.CreateRootFrame = nil
-  end
+  scope.root:SetSize(400, 200)
+  scope.root:SetPoint("CENTER", 0, 0)
+  scope.CreateRootFrame = nil
 end
 
-function scope.CreateRootPanel(event, ...)
-  OBroBindsPanelMixin = {}
-  function OBroBindsPanelMixin:OnDragStart(self)
-    scope.root:StartMoving()
-  end
-  function OBroBindsPanelMixin:OnDragStop(self)
-    scope.root:StopMovingOrSizing()
-  end
-  scope.panel = CreateFrame("frame", nil, scope.root, "OBroBindsPanelTemplate")
-  scope.panel.Title:SetText("OBroBinds")
+local function bg(frame, ...)
+  frame.bg = frame:CreateTexture(nil, "BACKGROUND")
+  frame.bg:SetAllPoints()
+  frame.bg:SetColorTexture(...)
+end
+
+function scope.CreatePanelFrame(event, ...)
+  --scope.panel: mouse enabled
+  scope.panel = CreateFrame("frame", nil, scope.root, "UIPanelDialogTemplate")
+  scope.panel:SetAllPoints()
   scope.panel:RegisterForDrag("LeftButton")
+  scope.panel.Title:SetText("OBroBinds")
   scope.panel:GetChildren():SetScript("OnClick", _G.OBroBinds_Toggle)
-  OBroBindsPanelMixin.OnDragStart = nil
-  OBroBindsPanelMixin.OnDragStop = nil
-  OBroBindsPanelMixin.OnShow = OnShow
-  OBroBindsPanelMixin.OnHide = OnHide
-  OBroBindsPanelMixin.NAME = "ADDON_KEYBOARD"
-  scope.keyboard = CreateFrame("frame", nil, scope.panel, "OBroBindsPageTemplate")
+  scope.panel:SetScript("OnDragStart", function()
+    scope.root:StartMoving()
+  end)
+  scope.panel:SetScript("OnDragStop", function()
+    scope.root:StopMovingOrSizing()
+  end)
+
+  scope.keyboard = CreateFrame("frame", nil, scope.panel, nil)
+  scope.keyboard:Hide()
+  scope.keyboard.NAME = "ADDON_KEYBOARD"
+  scope.keyboard:SetAllPoints()
+  scope.keyboard:SetScript("OnShow", OnShow)
+  scope.keyboard:SetScript("OnHide", OnHide)
   scope.keyboard:Show()
-  OBroBindsPanelMixin.NAME = "ADDON_SELECTOR"
-  scope.selector = CreateFrame("frame", nil, scope.panel, "OBroBindsPageTemplate")
-  scope.selector:Show()
-  OBroBindsPanelMixin.NAME = "ADDON_EDITOR"
-  scope.editor = CreateFrame("frame", "OBroPageEditor", scope.panel, "OBroBindsPageTemplate")
-  OBroBindsPanelMixin = nil
+
+  --scope.spellScroll = CreateFrame("frame", nil, scope.panel, "OListTemplate")
+
+  scope.selector = CreateFrame("frame", nil, scope.panel, nil)
+  scope.selector:Hide()
+  scope.selector.NAME = "ADDON_SELECTOR"
+  scope.selector:SetScript("OnShow", OnShow)
+  scope.selector:SetScript("OnHide", OnHide)
+  scope.selector:SetPoint("TOPLEFT", scope.panel, "TOPRIGHT", 0, 0)
+  scope.selector:SetPoint("BOTTOMLEFT", scope.panel, "BOTTOMRIGHT", 0, 0)
+  scope.selector:SetWidth(200)
+
+  scope.selector.button = CreateFrame("CheckButton", nil, scope.panel, "OBroBindsTabsTemplate")
+  scope.selector.button:ClearAllPoints()
+  scope.selector.button:SetPoint("TOPLEFT", scope.panel, "TOPRIGHT", 0, -32)
+  scope.selector.button:Show()
+  scope.selector.button:SetScript("OnClick", nil)
+  scope.selector.button.tooltip = "ok"
+  --local _, texture = GetSpellTabInfo(1)
+  --button:SetNormalTexture(texture)
+  --button:SetChecked(true)
+
+  bg(scope.selector, 0.5, 0.2, 0.4, 1)
+
+  scope.CreatePanelFrame = nil
   OnShow = nil
   OnHide = nil
-  scope.CreateRootPanel = nil
   return event(...)
 end
 
@@ -66,26 +90,3 @@ function scope.UpdatePlayerBindings(next, ...)
   end
   return next(...)
 end
-
-  --OBroBindsMixin = scope.clean(mixin)
-  --OBroBindsMixin.OnShow = OnShow
-  --OBroBindsMixin.OnHide = OnHide
-  --OBroBindsMixin.keyName = "PAGE_KEYBOARD"
-
-  --local button = CreateFrame("button", nil, scope.pageKeyboard, "UIPanelButtonTemplate")
-  --button:SetSize(100, 36)
-  --button:SetPoint("TOPRIGHT")
-  --button:SetText("Toggle Pause")
-  --local on = false
-  --button:SetScript("OnClick", function(self)
-    --scope.CLICK()
-  --end)
-
-  --OBroBindsMixin.keyName = "PAGE_SETTINGS"
-  --scope.pageSettings = CreateFrame("frame", "OBroPageSettings", scope.panel, "OBroBindsPageTemplate")
-
-  --local v = scope.dbRead("GUI", "page") or scope.tabKeyboard:GetID()
-  --PanelTemplates_SetTab(scope.panel, 1)
-  --PanelTemplates_TabResize(scope.tabKeyboard, 10)
-  --PanelTemplates_TabResize(scope.tabSettings, 10)
-  --mixin = scope.clean(OBroBindsMixin)

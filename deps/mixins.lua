@@ -29,74 +29,6 @@ do
   end
 end
 
-do
-  local function OnDragStart(self)
-    scope.root:StartMoving()
-  end
-  local function OnDragStop(self)
-    scope.root:StopMovingOrSizing()
-  end
-  local function OnClick(self)
-    local parent, id = self:GetParent(), self:GetID()
-    PanelTemplates_SetTab(parent, id)
-    for index, page in ipairs(parent.Pages) do
-      page[index == id and "Show" or "Hide"](page)
-    end
-  end
-
-  function scope.createRootPanels(event, ...)
-    scope.createRootPanels = nil
-
-    OBroBindsMixin = mixin or {}
-    OBroBindsMixin.OnDragStart = OnDragStart
-    OBroBindsMixin.OnDragStop = OnDragStop
-    scope.panel = CreateFrame("frame", nil, scope.root, "OBroBindsPanelTemplate")
-    --scope.panel.numTabs = 2
-    scope.panel.Title:SetText("OBroBinds")
-    scope.panel:RegisterForDrag("LeftButton")
-    local button = scope.panel:GetChildren()
-    button:SetScript("OnClick", _G.OBroBinds_Toggle)
-
-    --OBroBindsMixin = scope.clean(mixin)
-    --OBroBindsMixin.OnClick = OnClick
-    --scope.tabKeyboard = CreateFrame("button", "OBroTabKeybaord", scope.panel, "OBroBindsTabsTemplate")
-    --scope.tabKeyboard:SetID(1)
-    --scope.tabKeyboard:SetText("Keyboard")
-    --scope.tabKeyboard:SetPoint("TOPLEFT", scope.panel, "BOTTOMLEFT", 16, 8)
-
-    --scope.tabSettings = CreateFrame("button", "OBroTabSettings", scope.panel, "OBroBindsTabsTemplate")
-    --scope.tabSettings:SetID(2)
-    --scope.tabSettings:SetText("Settings")
-    --scope.tabSettings:SetPoint("LEFT", scope.tabKeyboard, "RIGHT", -12, 0)
-
-    OBroBindsMixin = scope.clean(mixin)
-    OBroBindsMixin.OnShow = OnShow
-    OBroBindsMixin.OnHide = OnHide
-    OBroBindsMixin.keyName = "PAGE_KEYBOARD"
-    scope.pageKeyboard = CreateFrame("frame", "OBroPageKeyboard", scope.panel, "OBroBindsPageTemplate")
-
-    --local button = CreateFrame("button", nil, scope.pageKeyboard, "UIPanelButtonTemplate")
-    --button:SetSize(100, 36)
-    --button:SetPoint("TOPRIGHT")
-    --button:SetText("Toggle Pause")
-    --local on = false
-    --button:SetScript("OnClick", function(self)
-      --scope.CLICK()
-    --end)
-
-    OBroBindsMixin.keyName = "PAGE_SETTINGS"
-    scope.pageSettings = CreateFrame("frame", "OBroPageSettings", scope.panel, "OBroBindsPageTemplate")
-
-    --local v = scope.dbRead("GUI", "page") or scope.tabKeyboard:GetID()
-    --PanelTemplates_SetTab(scope.panel, 1)
-    --PanelTemplates_TabResize(scope.tabKeyboard, 10)
-    --PanelTemplates_TabResize(scope.tabSettings, 10)
-
-    mixin = scope.clean(OBroBindsMixin)
-    OBroBindsMixin = nil
-    return event(...)
-  end
-end
 
 do
   local function OnClick(self)
@@ -250,5 +182,8 @@ do
     bg:SetAllPoints()
     bg:SetColorTexture(0.5, 0.2, 0.4, 0.5)
     return e(...)
+  end
+
+  function scope.UpdateEditBoxLayout(e, ...)
   end
 end

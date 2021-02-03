@@ -18,15 +18,11 @@ do
     scope:dispatch("ADDON_OFFSET_CHANGED")
   end
   local function CreateStanceButton(offset, icon, ...)
-    OBroBindsMixin = mixin or {}
-    OBroBindsMixin.OnClick = OnClick
-    local button = CreateFrame("button", nil, scope.keyboard, "OBroBindsStanceButtonTemplate")
+    local button = CreateFrame("button", nil, scope.keyboard, "ActionButtonTemplate")
     button.offset = offset
     button:RegisterForClicks("AnyUp")
     button:SetScript("OnClick", OnClick)
     button.icon:SetTexture("Interface/Icons/"..icon)
-    mixin = scope.clean(OBroBindsMixin)
-    OBroBindsMixin = nil
     return scope.push(button, ...)
   end
   function scope.InitializePageKeyboard(e, ...)
@@ -49,24 +45,23 @@ end
 
 local CreateActionButton
 do
-  local Mixin = {}
-  function Mixin:OnEnter()
+  local function OnEnter(self)
     scope:dispatch("ADDON_SHOW_TOOLTIP", self)
   end
-  function Mixin:OnLeave()
+  local function OnLeave()
     GameTooltip:Hide()
   end
-  function Mixin:OnDragStart()
+  local function OnDragStart(self)
     if InCombatLockdown() then return end
     scope:dispatch("ADDON_PICKUP_OVERRIDE_BINDING", self)
     self:UpdateButton()
   end
-  function Mixin:OnReceiveDrag()
+  local function OnReceiveDrag(self)
     if InCombatLockdown() then return end
     scope:dispatch("ADDON_RECEIVE_OVERRIDE_BINDING", self)
     self:UpdateButton()
   end
-  function Mixin:OnClick(button)
+  local function OnClick(self, button)
     if InCombatLockdown() then return end
     if button == "RightButton" then
       local binding = scope.modifier..self.key
@@ -79,8 +74,12 @@ do
     end
   end
   function CreateActionButton()
-    OBroBindsMixin = Mixin
-    local button = CreateFrame("button", nil, scope.keyboard, "OBroBindsActionButtonTemplate")
+    local button = CreateFrame("button", nil, scope.keyboard, "ActionButtonTemplate")
+    button:SetScript("OnEnter", OnEnter)
+    button:SetScript("OnLeave", OnLeave)
+    button:SetScript("OnDragStart", OnDragStart)
+    button:SetScript("OnReceiveDrag", OnReceiveDrag)
+    button:SetScript("OnClick", OnClick)
     button:RegisterForDrag("LeftButton")
     button:RegisterForClicks("AnyUp")
     button.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
@@ -89,7 +88,6 @@ do
     button.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
     button.AutoCastable:SetScale(0.4)
     button.AutoCastable:SetAlpha(0.75)
-    OBroBindsMixin = nil
     return button
   end
 end

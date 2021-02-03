@@ -13,7 +13,7 @@ scope.enqueue("PLAYER_LOGIN", setmetatable({
 
 scope.enqueue("ADDON_ROOT_SHOW", setmetatable({
   scope.STACK.fold, "ADDON_ROOT_HIDE",
-  scope.STACK.init, scope.CreateRootPanel,
+  scope.STACK.init, scope.CreatePanelFrame,
   scope.STACK.both, function(e, ...)
     if e.key == "ADDON_ROOT_SHOW" then
       scope.dbWrite('GUI', 'open', true)
@@ -55,14 +55,14 @@ scope.enqueue("ADDON_KEYBOARD_SHOW", setmetatable({
   scope.STACK.enqueue, "ADDON_SHOW_DROPDOWN",            scope.UpdateDropdown,
 }, scope.STACK))
 
-scope.enqueue("ADDON_SELECTOR_SHOW", setmetatable({
-  scope.STACK.fold, "ADDON_SELECTOR_HIDE",
-  scope.STACK.init, scope.InitializeSelector,
-  scope.STACK.call, function(e, ...)
-    print(e.key)
-    return e(...)
-  end,
-}, scope.STACK))
+--scope.enqueue("ADDON_SELECTOR_SHOW", setmetatable({
+  --scope.STACK.fold, "ADDON_SELECTOR_HIDE",
+  --scope.STACK.init, scope.InitializeSelector,
+  --scope.STACK.call, function(e, ...)
+    --print(e.key)
+    --return e(...)
+  --end,
+--}, scope.STACK))
 
 --[[
 scope.enqueue("ADDON_PAGE_SETTINGS_SHOW", setmetatable({
