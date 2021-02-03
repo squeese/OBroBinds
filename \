@@ -79,25 +79,8 @@ function scope.dbDeleteAction(binding)
   SetOverrideBinding(scope.root, false, binding, nil)
 end
 
+
 function scope.dbPromoteToAction(binding)
-  local kind, name = string.match(GetBindingAction(binding, false), "^(%w+) (.*)$")
-  if kind == 'SPELL' then
-    local icon, _, _, _, id = select(3, GetSpellInfo(name))
-    assert(name ~= nil)
-    scope.dbSaveAction(binding, kind, id, name, icon or 134400)
-  elseif kind == 'MACRO' then
-    local id = GetMacroIndexByName(name)
-    local icon = select(2, GetMacroInfo(name))
-    assert(name ~= nil)
-    scope.dbSaveAction(binding, kind, id, name, icon or 134400)
-  elseif kind == 'ITEM' then
-    local link, _, _, _, _, _, _, _, icon = select(2, GetItemInfo(name))
-    local id = link and select(4, string.find(link, "^|c%x+|H(%a+):(%d+)[|:]"))
-    assert(name ~= nil)
-    scope.dbSaveAction(binding, kind, id, name, icon or 134400)
-  else
-    assert(false, "Unhandled type: "..kind)
-  end
 end
 
 function scope.dbRead(...)
@@ -205,40 +188,18 @@ do
       self.Border:Hide()
       self.Name:SetText()
       local action = scope.dbGetAction(binding)
-      local command = GetBindingAction(binding, false)
-      local hasCommand = command ~= ""
+      local hasAction = GetBindingAction(binding, false) ~= ""
       local icon = action.kind and action:Icon()
       if icon then
         self.icon:SetVertexColor(1, 1, 1, 1)
         self.icon:SetTexture(icon)
-      elseif hasCommand then
-        self.icon:SetVertexColor(0.8, 1, 0.3, 0.5)
-        if command == "MOVEFORWARD" then
-          self.icon:SetTexture(450907)
-        elseif command == "MOVEBACKWARD" then
-          self.icon:SetTexture(450905)
-        elseif command == "STRAFELEFT" then
-          self.icon:SetTexture(450906)
-        elseif command == "STRAFERIGHT" then
-          self.icon:SetTexture(450908)
-        else
-          local kind, name = string.match(command, "^(%w+) (.*)$")
-          self.icon:SetVertexColor(0.4, 1, 0.4, 0.1)
-          if kind == "SPELL" then
-            self.icon:SetTexture(1519263)
-          elseif kind == "MACRO" then
-            self.icon:SetTexture("Interface\\MacroFrame\\MacroFrame-Icon")
-          elseif kind == "ITEM" then
-            self.icon:SetTexture(979584)
-          else
-            self.icon:SetTexture(892831)
-            self.icon:SetVertexColor(1, 0.4, 0.8, 0.2)
-          end
-        end
+      elseif hasAction then
+        self.icon:SetVertexColor(0.8, 1, 0.1, 0.1)
+        self.icon:SetTexture(136243)
       else
         self.icon:SetTexture(nil)
       end
-      if hasCommand then
+      if hasAction then
         self.AutoCastable:Show()
       else
         self.AutoCastable:Hide()
@@ -404,6 +365,29 @@ do
   end
 end
 
+--function _A.PromoteOverrideEntry(e, frame, binding)
+  --local action = GetBindingAction(binding, false)
+  --local kind, name = string.match(action, "^(%w+) (.*)$")
+  --if kind == 'SPELL' then
+    --local icon, _, _, _, id = select(3, GetSpellInfo(name))
+    --assert(name ~= nil)
+    --frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, kind, id, name, icon or 134400)
+  --elseif kind == 'MACRO' then
+    --local id = GetMacroIndexByName(name)
+    --local icon = select(2, GetMacroInfo(name))
+    --assert(name ~= nil)
+    --frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, kind, id, name, icon or 134400)
+  --elseif kind == 'ITEM' then
+    --local link, _, _, _, _, _, _, _, icon = select(2, GetItemInfo(name))
+    --local id = link and select(4, string.find(link, "^|c%x+|H(%a+):(%d+)[|:]"))
+    --assert(name ~= nil)
+    --frame:dispatch("SET_OVERRIDE_ENTRY", true, binding, kind, id, name, icon or 134400)
+  --else
+    --assert(false, "Unhandled type: "..kind)
+  --end
+  --return e:next(frame, binding)
+--end
+
 do
   --local function CURSOR_UPDATE(e, frame)
     --frame.__cursor = nil
@@ -442,6 +426,7 @@ do
 end
 
 function scope.ReceiveOverrideBinding(e, button, ...)
+  print("receive", button.key)
   local binding = scope.modifier..button.key
   if scope.mainbar[binding] then
     PlaceAction(scope.mainbar[binding] + scope.offset - 1)

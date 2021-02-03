@@ -1,63 +1,27 @@
-local _A = select(2, ...)
-local tinsert = _G.table.insert
-local tremove = _G.table.remove
+local scope = select(2, ...)
+local tinsert = table.insert
+local tremove = table.remove
+scope.empty = {}
+scope.pool = {}
 
-local function splice(tbl, index)
-  tremove(tbl, index)
-  return tbl
+function scope.poolPush(tbl, ...)
+  tinsert(scope.pool, setmetatable(scope.clean(tbl), nil))
+  return ...
 end
-_A.splice = splice
 
-local function shift(self, ...)
-  for i = 1, select("#", ...) do
-    local arg = select(i, ...)
-    tinsert(self, i, arg)
-  end
-  return self
-end
-_A.shift = shift
-
-local function push(tbl, ...)
-  for i = 1, select("#", ...) do
-    local arg = select(i, ...)
-    if arg ~= nil then
-      tinsert(tbl, arg)
-    end
-  end
-  return tbl
-end
-_A.push = push
-
-local function read(tbl, key, ...)
+function scope.read(tbl, key, ...)
   if not tbl then return nil end
   if not key then return tbl end
-  return read(tbl[key], ...)
+  return scope.read(tbl[key], ...)
 end
-_A.read = read
 
-local function eof() end
-local function map(iter, ...)
-  local tbl = read(...)
-  if not tbl then return eof end
-  return (iter or pairs)(tbl)
-end
-_A.map = map
-
-
-local POOL = {}
-local function write(tbl, key, ...)
+function scope.write(tbl, key, ...)
   if not tbl then
-    local tbl = tremove(POOL) or {}
-    print("GET", tbl)
-    return write(tbl, key, ...)
+    return scope.write({}, key, ...)
   elseif type(key) == 'function' then
-    local before = tbl
     tbl = key(tbl, ...)
-    if before ~= tbl then
-      print("WTF", before)
-    end
   elseif select("#", ...) > 0 then
-    tbl[key] = write(tbl[key], ...)
+    tbl[key] = scope.write(tbl[key], ...)
   else
     return key
   end
@@ -67,153 +31,135 @@ local function write(tbl, key, ...)
   for _ in pairs(tbl) do
     return tbl
   end
-  print("RELEASE", tbl)
-  tinsert(POOL, tbl)
   return nil
 end
 
-local t
-t = write(t, "one", "two", 3)
-t = write(t, "one", nil)
-
-_A.write = write
-
-local function next(fn, ...)
+function scope.call(fn, ...)
   if fn and type(fn) == 'function' then
     return fn(...)
   end
   return fn, ...
 end
-_A.next = next
 
-local function match(val, arg, ...)
+function scope.next(self, fn, ...)
+  if type(fn) == 'function' then
+    return fn(self, ...)
+  end
+  return self, fn, ...
+end
+
+function scope.match(val, arg, ...)
   if val == arg then return true end
-  return select("#", ...) > 0 and next(val, match, ...) or false
+  return select("#", ...) > 0 and scope.match(val, ...) or false
 end
-_A.match = match
 
+function scope.splice(self, index, ...)
+  tremove(self, index)
+  return self, ...
+end
 
-do
-  local root = _G.OBroBindsRootFrame
-  local SUBS
-  local function listen(key, fn)
-    if not fn then return nil end
-    for _, entry in map(ipairs, SUBS, key) do
-      if fn == entry then
-        return fn
-      end
-    end
-    SUBS = write(SUBS, key, push, fn)
-    if #read(SUBS, key) == 1 and strsub(key, 1, 5) ~= "ADDON" then
-      --print("register", key)
-      root:RegisterEvent(key)
-    end
-    return fn
+function scope.shift(self, ...)
+  for i = 1, select("#", ...) do
+    local arg = select(i, ...)
+    tinsert(self, i, arg)
   end
-  _A.listen = listen
+  return self
+end
 
-  local function release(key, fn)
-    for index, entry in map(ipairs, SUBS, key) do
-      if fn == entry then
-        SUBS = write(SUBS, key, splice, index)
-        break
-      end
-    end
-    if not read(SUBS, key) and strsub(key, 1, 5) ~= "ADDON" then
-      --print("remove", key)
-      root:UnregisterEvent(key)
-    end
+function scope.push(self, ...)
+  for i = 1, select("#", ...) do
+    local arg = select(i, ...)
+    tinsert(self, arg)
   end
-  _A.release = release
+  return self
+end
 
-  do
-    local Q = {}
-    Q.__index = Q
-    function Q:__call(...)
-      if #self > 0 then
-        return tremove(self, 1)(self, ...)
-      end
-      return ...
-    end
-    local pool = {}
-    local function reuse(q, ...)
-      for key in pairs(q) do
-        q[key] = nil
-      end
-      tinsert(pool, q)
-      return ...
-    end
-    function root:dispatch(key, ...)
-      local subs = read(SUBS, key)
-      if not subs then return end
-      local q = push(tremove(pool) or setmetatable({}, Q), unpack(subs))
-      q.key = key
-      return reuse(q, q(self, ...))
+function scope.clean(self, ...)
+  for k in next, self do
+    self[k] = nil
+  end
+  return scope.next(self, ...)
+end
+
+function scope.enqueue(key, fn)
+  if fn and not scope.match(fn, unpack(scope.read(scope, key) or scope.empty)) then
+    scope.write(scope, key, scope.push, fn)
+    if #scope.read(scope, key) == 1 and strsub(key, 1, 5) ~= "ADDON" then
+      scope.root:RegisterEvent(key)
     end
   end
 end
 
+function scope.dequeue(key, fn)
+  for index, entry in next, scope.read(scope, key) or scope.empty do
+    if fn == entry then
+      scope.write(scope, key, scope.splice, index)
+      break
+    end
+  end
+  if not scope.read(scope, key) and strsub(key, 1, 5) ~= "ADDON" then
+    scope.root:UnregisterEvent(key)
+  end
+end
 
+
+scope.EVENT = {}
+scope.EVENT.__call = function(self, ...)
+  if #self > 0 then
+    return tremove(self, 1)(self, ...)
+  end
+  return ...
+end
+
+function scope:dispatch(key, ...)
+  local subs = scope.read(scope, key)
+  if not subs then return end
+  local event = scope.push(setmetatable(tremove(scope.pool) or {}, scope.EVENT), unpack(subs))
+  event.key = key
+  return scope.poolPush(event, event(...))
+end
+
+scope.STACK = {}
+scope.STACK.__index = scope.STACK
+function scope.STACK:__call(...)
+  return scope.next(scope.push(self, ...), scope.clean, unpack(self))
+end
 do
-  local function walk(self, fn, ...)
-    if type(fn) == 'function' then
-      return fn(self, ...)
+  local function fold(key, self, event, ...)
+    scope.dequeue(event.key, self)
+    if key then
+      scope.enqueue(key, self)
+      scope.shift(self, self.fold, event.key)
     end
-    return self, fn, ...
+    return event(...)
   end
-  local function clean(self, ...)
-    for i = #self, 1, -1 do
-      self[i] = nil
-    end
-    return walk(self, ...)
+  function scope.STACK.fold(self, key, ...)
+    return fold(key, scope.next(self, ...))
   end
-
-  local STACK = {}
-  STACK.__index = STACK
-
-
+end
+do
   local function skip(self, fn, arg, ...)
-    return walk(shift(self, fn, arg), ...)
+    return scope.next(scope.shift(self, fn, arg), ...)
   end
   local function call(fn, self, event, ...)
-    shift(event, fn)
+    scope.shift(event, fn)
     return self, event, ...
   end
-  function STACK.call(self, fn, ...)
-    return call(fn, walk(shift(self, skip, self.call, fn), ...))
+  function scope.STACK.call(self, fn, ...)
+    return call(fn, scope.next(scope.shift(self, skip, self.call, fn), ...))
   end
-  function STACK.init(self, fn, ...)
-    return call(fn, walk(self, ...))
+  function scope.STACK.init(self, fn, ...)
+    return call(fn, scope.next(self, ...))
   end
-  function STACK.both(self, fn, ...)
-    return call(fn, walk(shift(self, self.both, fn), ...))
+  function scope.STACK.both(self, fn, ...)
+    return call(fn, scope.next(scope.shift(self, self.both, fn), ...))
   end
-  local release = _A.release
-  local listen = _A.listen
-  function STACK.release(self, event, fn, ...)
-    release(event, fn)
-    return walk(shift(self, self.listen, event, fn), ...)
-  end
-  function STACK.listen(self, event, fn, ...)
-    listen(event, fn)
-    return walk(shift(self, self.release, event, fn), ...)
-  end
-  do
-    local function fold(key, self, event, ...)
-      _A.release(event.key, self)
-      if key then
-        _A.listen(key, self)
-        shift(self, self.fold, event.key)
-      end
-      print("FOLD", key)
-      return event(...)
-    end
-    function STACK.fold(self, key, ...)
-      return fold(key, walk(self, ...))
-    end
-  end
-  function STACK:__call(...)
-    return walk(push(self, ...), clean, unpack(self))
-  end
-  _A.STACK = STACK
+end
+function scope.STACK.dequeue(self, event, fn, ...)
+  scope.dequeue(event, fn)
+  return scope.next(scope.shift(self, self.enqueue, event, fn), ...)
+end
+function scope.STACK.enqueue(self, event, fn, ...)
+  scope.enqueue(event, fn)
+  return scope.next(scope.shift(self, self.dequeue, event, fn), ...)
 end

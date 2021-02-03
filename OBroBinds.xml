@@ -1,69 +1,11 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/FrameXML/UI.xsd">
-  <!--
-  <Button name="OBroBindsStanceButtonTemplate" inherits="ActionButtonTemplate" virtual="true">
-    <Scripts>
-      <OnLoad>
-        self:RegisterForClicks("AnyUp")
-      </OnLoad>
-      <OnClick>
-        local page = self:GetParent()
-        page.offset = self.offset ~= page.offset and self.offset or 1
-        page:dispatch("ADDON_OFFSET_CHANGED")
-      </OnClick>
-    </Scripts>
-  </Button>
-
-  <Button name="OBroBindsOverrideButtonTemplate" inherits="ActionButtonTemplate" virtual="true">
-    <Scripts>
-      <OnLoad>
-        self:RegisterForDrag("LeftButton")
-        self:RegisterForClicks("AnyUp")
-        self.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
-        self.AutoCastable:SetTexCoord(0.15, 0.6, 0.6, 0.15)
-        self.AutoCastable:ClearAllPoints()
-        self.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
-        self.AutoCastable:SetScale(0.4)
-        self.AutoCastable:SetAlpha(0.75)
-      </OnLoad>
-      <OnEnter>
-        self:GetParent():dispatch("ADDON_SHOW_TOOLTIP", self)
-      </OnEnter>
-      <OnLeave>
-        GameTooltip:Hide()
-      </OnLeave>
-      <OnDragStart>
-        if InCombatLockdown() then return end
-        self:GetParent():dispatch("ADDON_PICKUP_OVERRIDE_BINDING", self)
-        self:UpdateButton()
-      </OnDragStart>
-      <OnReceiveDrag>
-        if InCombatLockdown() then return end
-        self:GetParent():dispatch("ADDON_RECEIVE_OVERRIDE_BINDING", self)
-        self:UpdateButton()
-      </OnReceiveDrag>
-      <OnClick>
-        if InCombatLockdown() then return end
-        if button == "RightButton" then
-          local page = self:GetParent()
-          local binding = page.modifier..self.key
-          if not page.mainbar[binding] then
-            page:dispatch("ADDON_SHOW_DROPDOWN", self)
-          end
-        elseif GetCursorInfo() then
-          self:GetParent():dispatch("ADDON_RECEIVE_OVERRIDE_BINDING", self)
-          self:UpdateButton()
-        end
-      </OnClick>
-    </Scripts>
-  </Button>
-  <Script file="deps/action.lua"
+  <Script file="deps/utilities.lua" />
+  <Script file="deps/mixins.lua" />
   <Script file="deps/layouts.lua" />
   <Script file="deps/handlers.lua" />
-  -->
+  <Script file="deps/dropdown.lua" />
 
-  <Script file="deps/utils.funcs.lua" />
-  <Script file="deps/mixins.lua" />
-  <Frame name="OBroBindsRootFrameTemplate" mixin="OBroBindsMixin" hidden="true" virtual="true">
+  <Frame name="OBroBindsRootTemplate" mixin="OBroBindsMixin" hidden="true" virtual="true" movable="true">
     <Size>
       <AbsDimension x="320" y="240" />
     </Size>
@@ -78,214 +20,109 @@
     </Scripts>
   </Frame>
 
-  <Frame name="OBroBindsRootFramePanelTemplate" inherits="UIPanelDialogTemplate,BackdropTemplate" virtual="true">
+  <Frame name="OBroBindsPanelTemplate" mixin="OBroBindsMixin" inherits="UIPanelDialogTemplate" virtual="true" enableMouse="true">
     <Anchors>
       <Anchor point="TOPLEFT" />
       <Anchor point="BOTTOMRIGHT" />
     </Anchors>
-    <KeyValues>
-      <KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_16_16_5555" type="global"/>
-      <KeyValue key="backdropColor" value="TOOLTIP_DEFAULT_BACKGROUND_COLOR" type="global"/>
-      <KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
-    </KeyValues>
+    <Scripts>
+      <OnDragStart method="OnDragStart" />
+      <OnDragStop method="OnDragStop" />
+    </Scripts>
   </Frame>
 
-  <Button name="OBroBindsRootFramePanelTabsTemplate" inherits="CharacterFrameTabButtonTemplate" parentArray="Tabs" virtual="true">
-    <!--
+  <Button name="OBroBindsTabsTemplate" mixin="OBroBindsMixin" inherits="CharacterFrameTabButtonTemplate" parentArray="Tabs" virtual="true">
     <Scripts>
-      <OnLoad>
-        self:SetID(self.index)
-        self:SetText(self.title)
-      </OnLoad>
-      <OnClick>
-        local parent, id = self:GetParent(), self:GetID()
-        PanelTemplates_SetTab(parent, id)
-        for index, page in ipairs(parent.Pages) do
-          page[index == id and "Show" or "Hide"](page)
-        end
-      </OnClick>
+      <OnClick method="OnClick" />
     </Scripts>
-    -->
   </Button>
 
-  <Frame name="OBroBindsRootFramePanelPageTemplate" parentArray="Pages" hidden="true" virtual="true">
+  <Frame name="OBroBindsPageTemplate" mixin="OBroBindsMixin" parentArray="Pages" hidden="true" virtual="true">
     <Anchors>
       <Anchor point="TOPLEFT" />
       <Anchor point="BOTTOMRIGHT" />
     </Anchors>
-    <!--
     <Scripts>
-      <OnShow>
-        self:GetParent():dispatch("ADDON_PAGE_"..self.name.."_SHOW")
-      </OnShow>
-      <OnHide>
-        self:GetParent():dispatch("ADDON_PAGE_"..self.name.."_HIDE")
-      </OnHide>
+      <OnShow method="OnShow" />
+      <OnHide method="OnHide" />
     </Scripts>
-    -->
   </Frame>
-  <Script file="OBroBinds.lua" />
 
+  <Button name="OBroBindsStanceButtonTemplate" mixin="OBroBindsMixin" inherits="ActionButtonTemplate" virtual="true">
+    <Scripts>
+      <OnClick method="OnClick" />
+    </Scripts>
+  </Button>
 
+  <Button name="OBroBindsActionButtonTemplate" mixin="OBroBindsMixin" inherits="ActionButtonTemplate" virtual="true">
+    <Scripts>
+      <OnEnter method="OnEnter" />
+      <OnLeave method="OnLeave" />
+      <OnDragStart method="OnDragStart" />
+      <OnReceiveDrag method="OnReceiveDrag" />
+      <OnClick method="OnClick" />
+    </Scripts>
+  </Button>
 
-      <!--
-    <Frames>
-      <Button parentKey="tabKeyboard" name="$parentTabKeyboard" inherits="OBroBindsTabTemplate">
-        <KeyValues>
-          <KeyValue key="index" value="1" type="number" />
-          <KeyValue key="title" value="Keyboard" type="string" />
-        </KeyValues>
-        <Anchors>
-          <Anchor point="TOPLEFT" relativeTo="$parent" relativePoint="BOTTOMLEFT" x="16" y="8" />
-        </Anchors>
-      </Button>
-      <Button parentKey="tabSettings" name="$parentTabSettings" inherits="OBroBindsTabTemplate">
-        <KeyValues>
-          <KeyValue key="index" value="2" type="number" />
-          <KeyValue key="title" value="Settings" type="string" />
-        </KeyValues>
-        <Anchors>
-          <Anchor point="LEFT" relativeTo="$parentTabKeyboard" relativePoint="RIGHT" x="-12" y="0" />
-        </Anchors>
-      </Button>
-      <Frame parentKey="pageKeyboard" inherits="OBroBindsPageTemplate">
-        <KeyValues>
-          <KeyValue key="name" value="KEYBOARD" type="string" />
-        </KeyValues>
-      </Frame>
-      <Frame parentKey="pageSettings" inherits="OBroBindsPageTemplate">
-        <KeyValues>
-          <KeyValue key="name" value="SETTINGS" type="string" />
-        </KeyValues>
-      </Frame>
-    </Frames>
-    -->
+  <ScrollFrame name="OBroBindsScrollTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
+    <Anchors>
+      <Anchor point="TOPLEFT" x="18" y="-36" />
+      <Anchor point="BOTTOMRIGHT" x="-18" y="18" />
+    </Anchors>
+    <Scripts>
+      <OnLoad>
+        self.scrollBarHideable = true
+        ScrollFrame_OnLoad(self)
+      </OnLoad>
+    </Scripts>
+  </ScrollFrame>
 
-
-
-  <!--
-  <Frame name="OBroBindsFrameTemplate" movable="true" parent="UIParent" hidden="true" inherits="BackdropTemplate" virtual="true">
-    <Size>
-      <AbsDimension x="320" y="240" />
-    </Size>
+  <EditBox name="OBroBindsEditTemplate" multiLine="true" autoFocus="false" virtual="true">
     <Anchors>
       <Anchor point="CENTER" />
     </Anchors>
-    <KeyValues>
-    </KeyValues>
     <Scripts>
       <OnLoad>
-        BackdropTemplateMixin.OnBackdropLoaded(self)
-        function _G.OBroBinds_Toggle()
-          self:dispatch("GUI_TOGGLE", false)
-        end
+        ScrollingEdit_OnCursorChanged(self, 0, 0, 0, 0)
       </OnLoad>
-      <OnShow>
-        self:dispatch("GUI_SHOW")
-      </OnShow>
-      <OnHide>
-        self:dispatch("GUI_HIDE")
-      </OnHide>
-      <OnEvent>
-        self:dispatch(event, ...)
-      </OnEvent>
+      <OnTextChanged>
+        ScrollingEdit_OnTextChanged(self, self:GetParent())
+      </OnTextChanged>
+      <OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
+      <OnUpdate>
+        ScrollingEdit_OnUpdate(self, elapsed, self:GetParent())
+      </OnUpdate>
+      <OnEscapePressed function="EditBox_ClearFocus"/>
     </Scripts>
-    <Frames>
-      <Frame enableMouse="true" inherits="DialogHeaderTemplate">
-        <Anchors>
-          <Anchor point="TOP" y="24" />
-          <Anchor point="RIGHT" x="-24" />
-        </Anchors>
-        <Scripts>
-          <OnLoad>
-            self.Text:SetText("OBroBinds")
-            self:RegisterForDrag("LeftButton")
-          </OnLoad>
-          <OnDragStart>
-            self:GetParent():StartMoving()
-          </OnDragStart>
-          <OnDragStop>
-            self:GetParent():StopMovingOrSizing()
-          </OnDragStop>
-        </Scripts>
-      </Frame>
-      <Button inherits="UIPanelCloseButtonNoScripts">
-        <Anchors>
-          <Anchor point="TOPRIGHT" x="0" y="20" />
-        </Anchors>
-        <Scripts>
-          <OnClick>
-            OBroBinds_Toggle()
-          </OnClick>
-        </Scripts>
-      </Button>
-      <Frame parentKey="drawer" hidden="true" inherits="BackdropTemplate">
-        <Anchors>
-          <Anchor point="TOPLEFT" relativeTo="$parent" relativePoint="BOTTOMLEFT" x="0" y="" />
-          <Anchor point="BOTTOMRIGHT" relativeTo="$parent" relativePoint="BOTTOMRIGHT" x="0" y="-200" />
-        </Anchors>
-        <KeyValues>
-          <KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_16_16_5555" type="global"/>
-          <KeyValue key="backdropColor" value="TOOLTIP_DEFAULT_BACKGROUND_COLOR" type="global"/>
-          <KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
-        </KeyValues>
+    <FontString inherits="GameFontHighlightMedium"/>
+  </EditBox>
 
-        <Frames>
-          <ScrollFrame parentKey="scroll" name="$parentScroll" inherits="UIPanelScrollFrameTemplate">
-            <Anchors>
-              <Anchor point="TOPLEFT" x="10" y="-10" />
-              <Anchor point="BOTTOMRIGHT" x="-150" y="10" />
-            </Anchors>
-            <ScrollChild>
-              <EditBox parentKey="edit" multiLine="true" autoFocus="false">
-                <Scripts>
-                  <OnLoad>
-                    ScrollingEdit_OnCursorChanged(self, 0, 0, 0, 0)
-                  </OnLoad>
-                  <OnTextChanged>
-                    ScrollingEdit_OnTextChanged(self, self:GetParent())
-                  </OnTextChanged>
-                  <OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
-                  <OnUpdate>
-                    ScrollingEdit_OnUpdate(self, elapsed, self:GetParent())
-                  </OnUpdate>
-                  <OnEscapePressed function="EditBox_ClearFocus"/>
-                </Scripts>
-                <FontString inherits="GameFontHighlightSmall"/>
-              </EditBox>
-            </ScrollChild>
-            <Scripts>
-              <OnLoad>
-                ScrollFrame_OnLoad(self)
-              </OnLoad>
-            </Scripts>
-          </ScrollFrame>
-          <Button>
-            <Anchors>
-              <Anchor point="TOPLEFT" relativeTo="$parentScroll" relativePoint="TOPLEFT" />
-              <Anchor point="BOTTOMRIGHT" relativeTo="$parentScroll" relativePoint="BOTTOMRIGHT" />
-            </Anchors>
-            <Scripts>
-              <OnClick>
-                self:GetParent().scroll.edit:SetFocus()
-              </OnClick>
-            </Scripts>
-          </Button>
-          <Button text="Save" inherits="UIPanelButtonTemplate">
-            <Size>
-              <AbsDimension x="115" y="32" />
-            </Size>
-            <Anchors>
-              <Anchor point="TOPRIGHT" x="-8" y="-8" />
-            </Anchors>
-            <Scripts>
-              <OnClick>
-              </OnClick>
-            </Scripts>
-          </Button>
-        </Frames>
-      </Frame>
-    </Frames>
+  <Button name="OLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTextTemplate" virtual="true">
+    <Size>
+      <AbsDimension y="28" />
+    </Size>
+    <Scripts>
+      <OnDragStart method="OnDragStart" />
+      <OnReceiveDrag method="OnReceiveDrag" />
+    </Scripts>
+    <Layers>
+      <Layer level="BACKGROUND">
+        <FontString parentKey="TextMiddle" inherits="GameFontHighlightSmall" justifyH="LEFT" maxLines="1">
+          <Anchors>
+            <Anchor point="LEFT" x="32" />
+            <Anchor point="RIGHT" x="-32" />
+          </Anchors>
+        </FontString>
+        <Texture parentKey="Icon" />
+      </Layer>
+    </Layers>
+  </Button>
+
+  <Frame name="OListTemplate" mixin="OBroBindsListMixin" inherits="ScrollListTemplate" virtual="true">
+    <Scripts>
+      <OnLoad method="OnLoad" />
+    </Scripts>
   </Frame>
-  -->
+
+  <Script file="OBroBinds.lua" />
 </Ui>
