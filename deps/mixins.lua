@@ -51,23 +51,23 @@ do
     OBroBindsMixin.OnDragStart = OnDragStart
     OBroBindsMixin.OnDragStop = OnDragStop
     scope.panel = CreateFrame("frame", nil, scope.root, "OBroBindsPanelTemplate")
-    scope.panel.numTabs = 2
+    --scope.panel.numTabs = 2
     scope.panel.Title:SetText("OBroBinds")
     scope.panel:RegisterForDrag("LeftButton")
     local button = scope.panel:GetChildren()
     button:SetScript("OnClick", _G.OBroBinds_Toggle)
 
-    OBroBindsMixin = scope.clean(mixin)
-    OBroBindsMixin.OnClick = OnClick
-    scope.tabKeyboard = CreateFrame("button", "OBroTabKeybaord", scope.panel, "OBroBindsTabsTemplate")
-    scope.tabKeyboard:SetID(1)
-    scope.tabKeyboard:SetText("Keyboard")
-    scope.tabKeyboard:SetPoint("TOPLEFT", scope.panel, "BOTTOMLEFT", 16, 8)
+    --OBroBindsMixin = scope.clean(mixin)
+    --OBroBindsMixin.OnClick = OnClick
+    --scope.tabKeyboard = CreateFrame("button", "OBroTabKeybaord", scope.panel, "OBroBindsTabsTemplate")
+    --scope.tabKeyboard:SetID(1)
+    --scope.tabKeyboard:SetText("Keyboard")
+    --scope.tabKeyboard:SetPoint("TOPLEFT", scope.panel, "BOTTOMLEFT", 16, 8)
 
-    scope.tabSettings = CreateFrame("button", "OBroTabSettings", scope.panel, "OBroBindsTabsTemplate")
-    scope.tabSettings:SetID(2)
-    scope.tabSettings:SetText("Settings")
-    scope.tabSettings:SetPoint("LEFT", scope.tabKeyboard, "RIGHT", -12, 0)
+    --scope.tabSettings = CreateFrame("button", "OBroTabSettings", scope.panel, "OBroBindsTabsTemplate")
+    --scope.tabSettings:SetID(2)
+    --scope.tabSettings:SetText("Settings")
+    --scope.tabSettings:SetPoint("LEFT", scope.tabKeyboard, "RIGHT", -12, 0)
 
     OBroBindsMixin = scope.clean(mixin)
     OBroBindsMixin.OnShow = OnShow
@@ -88,9 +88,9 @@ do
     scope.pageSettings = CreateFrame("frame", "OBroPageSettings", scope.panel, "OBroBindsPageTemplate")
 
     --local v = scope.dbRead("GUI", "page") or scope.tabKeyboard:GetID()
-    PanelTemplates_SetTab(scope.panel, 2)
-    PanelTemplates_TabResize(scope.tabKeyboard, 10)
-    PanelTemplates_TabResize(scope.tabSettings, 10)
+    --PanelTemplates_SetTab(scope.panel, 1)
+    --PanelTemplates_TabResize(scope.tabKeyboard, 10)
+    --PanelTemplates_TabResize(scope.tabSettings, 10)
 
     mixin = scope.clean(OBroBindsMixin)
     OBroBindsMixin = nil
@@ -171,6 +171,8 @@ end
 do
   OBroBindsLineMixin = {}
 
+  local tmp
+
   function OBroBindsLineMixin:InitElement(...)
     self:RegisterForDrag("LeftButton")
     self:RegisterForClicks("AnyUp")
@@ -178,6 +180,13 @@ do
     self.Icon:SetPoint("TOPRIGHT", -2, -2)
     self.Icon:SetPoint("BOTTOMLEFT", self, "BOTTOMRIGHT", -30, 2)
     self.Icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+    if tmp then
+      tmp:Cancel()
+    end
+    tmp = C_Timer.NewTicker(1, function()
+      self:OnSelected()
+      tmp = nil
+    end, 1)
   end
 
   function OBroBindsLineMixin:UpdateDisplay()
@@ -229,16 +238,15 @@ end
 do
   function scope.createEditbox(e, ...)
     scope.editScroll = CreateFrame("ScrollFrame", nil, scope.pageSettings, "OBroBindsScrollTemplate")
-    scope.editBox = CreateFrame("EditBox", nil, scope.editScroll, "OBroBindsEditTemplate")
-    scope.editScroll:SetScrollChild(edit)
-    scope.editBox:SetPoint("TOPLEFT", 0, 0)
-    scope.editBox:SetSize(scope.panel:GetWidth()-40, scope.panel:GetHeight()-40)
+    --scope.editScroll.edit:SetSize(scope.panel:GetWidth()-40, scope.panel:GetHeight()-40)
+    scope.editScroll.edit:SetPoint("TOPLEFT", 8, -8)
+    scope.editScroll.edit:SetSize(100, 100)
     local button = CreateFrame("button", nil, scope.pageSettings)
-    button:SetAllPoints()
+    button:SetAllPoints(scope.editScroll)
     button:SetScript("OnClick", function()
-      scope.editBox:SetFocus()
+      scope.editScroll.edit:SetFocus()
     end)
-    local bg = scope.editBox:CreateTexture(nil, "BACKGROUND")
+    local bg = scope.editScroll.edit:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(0.5, 0.2, 0.4, 0.5)
     return e(...)

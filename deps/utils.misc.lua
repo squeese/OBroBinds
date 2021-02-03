@@ -34,6 +34,14 @@ function scope.write(tbl, key, ...)
   return nil
 end
 
+function scope.dbRead(...)
+  return scope.read(OBroBindsDB, ...)
+end
+
+function scope.dbWrite(...)
+  OBroBindsDB = scope.write(OBroBindsDB, ...)
+end
+
 function scope.call(fn, ...)
   if fn and type(fn) == 'function' then
     return fn(...)

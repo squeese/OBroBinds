@@ -1,0 +1,15 @@
+<Ui xmlns='http://www.blizzard.com/wow/ui/'>
+  <Script file="keyboard.lua" />
+
+  <Button name="OBroBindsStanceButtonTemplate" inherits="ActionButtonTemplate" virtual="true" />
+
+  <Button name="OBroBindsActionButtonTemplate" mixin="OBroBindsMixin" inherits="ActionButtonTemplate" virtual="true">
+    <Scripts>
+      <OnEnter method="OnEnter" />
+      <OnLeave method="OnLeave" />
+      <OnDragStart method="OnDragStart" />
+      <OnReceiveDrag method="OnReceiveDrag" />
+      <OnClick method="OnClick" />
+    </Scripts>
+  </Button>
+</Ui>

@@ -1,5 +1,13 @@
-<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/FrameXML/UI.xsd">
-  <Script file="deps/utilities.lua" />
+<Ui xmlns='http://www.blizzard.com/wow/ui/'>
+  <Script file="deps\utils.misc.lua" />
+  <Script file="deps\utils.action.lua" />
+  <Script file="deps\layouts.lua" />
+  <Include file="sections\root.xml" />
+  <Include file="sections\keyboard.xml" />
+  <Include file="sections\selector.xml" />
+  <Script file="OBroBinds.lua" />
+
+  <!--
   <Script file="deps/mixins.lua" />
   <Script file="deps/layouts.lua" />
   <Script file="deps/handlers.lua" />
@@ -64,38 +72,42 @@
     </Scripts>
   </Button>
 
-  <ScrollFrame name="OBroBindsScrollTemplate" inherits="UIPanelScrollFrameTemplate" virtual="true">
+  <ScrollFrame name="OBroBindsScrollTemplate" inherits="UIPanelScrollFrameTemplate,BackdropTemplate" virtual="true">
     <Anchors>
       <Anchor point="TOPLEFT" x="18" y="-36" />
       <Anchor point="BOTTOMRIGHT" x="-18" y="18" />
     </Anchors>
+    <KeyValues>
+      <KeyValue key="backdropInfo" value="BACKDROP_TOOLTIP_16_16_5555" type="global"/>
+      <KeyValue key="backdropColor" value="TOOLTIP_DEFAULT_BACKGROUND_COLOR" type="global"/>
+      <KeyValue key="backdropBorderColor" value="TOOLTIP_DEFAULT_COLOR" type="global"/>
+    </KeyValues>
+    <ScrollChild>
+      <EditBox parentKey="edit" multiLine="true" autoFocus="false">
+        <Scripts>
+          <OnLoad>
+            ScrollingEdit_OnCursorChanged(self, 0, 0, 0, 0)
+          </OnLoad>
+          <OnTextChanged>
+            ScrollingEdit_OnTextChanged(self, self:GetParent())
+          </OnTextChanged>
+          <OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
+          <OnUpdate>
+            ScrollingEdit_OnUpdate(self, elapsed, self:GetParent())
+          </OnUpdate>
+          <OnEscapePressed function="EditBox_ClearFocus"/>
+        </Scripts>
+        <FontString inherits="GameFontHighlightMedium"/>
+      </EditBox>
+    </ScrollChild>
     <Scripts>
       <OnLoad>
-        self.scrollBarHideable = true
+        BackdropTemplateMixin.OnBackdropLoaded(self)
+        self.scrollBarHideable = false
         ScrollFrame_OnLoad(self)
       </OnLoad>
     </Scripts>
   </ScrollFrame>
-
-  <EditBox name="OBroBindsEditTemplate" multiLine="true" autoFocus="false" virtual="true">
-    <Anchors>
-      <Anchor point="CENTER" />
-    </Anchors>
-    <Scripts>
-      <OnLoad>
-        ScrollingEdit_OnCursorChanged(self, 0, 0, 0, 0)
-      </OnLoad>
-      <OnTextChanged>
-        ScrollingEdit_OnTextChanged(self, self:GetParent())
-      </OnTextChanged>
-      <OnCursorChanged function="ScrollingEdit_OnCursorChanged"/>
-      <OnUpdate>
-        ScrollingEdit_OnUpdate(self, elapsed, self:GetParent())
-      </OnUpdate>
-      <OnEscapePressed function="EditBox_ClearFocus"/>
-    </Scripts>
-    <FontString inherits="GameFontHighlightMedium"/>
-  </EditBox>
 
   <Button name="OLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTextTemplate" virtual="true">
     <Size>
@@ -123,6 +135,6 @@
       <OnLoad method="OnLoad" />
     </Scripts>
   </Frame>
+  -->
 
-  <Script file="OBroBinds.lua" />
 </Ui>

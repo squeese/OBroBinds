@@ -1,0 +1,34 @@
+<Ui xmlns='http://www.blizzard.com/wow/ui/'>
+  <Script file="selector.lua" />
+
+  <Button name="OBroBindsTabsTemplate" inherits="SpellBookSkillLineTabTemplate" virtual="true" />
+
+  <!--
+  <Button name="OLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTextTemplate" virtual="true">
+    <Size>
+      <AbsDimension y="28" />
+    </Size>
+    <Scripts>
+      <OnDragStart method="OnDragStart" />
+      <OnReceiveDrag method="OnReceiveDrag" />
+    </Scripts>
+    <Layers>
+      <Layer level="BACKGROUND">
+        <FontString parentKey="TextMiddle" inherits="GameFontHighlightSmall" justifyH="LEFT" maxLines="1">
+          <Anchors>
+            <Anchor point="LEFT" x="32" />
+            <Anchor point="RIGHT" x="-32" />
+          </Anchors>
+        </FontString>
+        <Texture parentKey="Icon" />
+      </Layer>
+    </Layers>
+  </Button>
+
+  <Frame name="OListTemplate" mixin="OBroBindsListMixin" inherits="ScrollListTemplate" virtual="true">
+    <Scripts>
+      <OnLoad method="OnLoad" />
+    </Scripts>
+  </Frame>
+  -->
+</Ui>
