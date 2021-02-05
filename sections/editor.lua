@@ -104,6 +104,12 @@ function scope.InitializeEditor(e, ...)
   scope.editor.name.Right:Hide()
   scope.editor.name.Middle:Hide()
 
+  scope.editor.script = CreateFrame("checkbutton", nil, scope.editor, "UICheckButtonTemplate")
+  scope.editor.script.text:SetText("Script")
+  scope.editor.script:SetScript("OnClick", function(self)
+    scope:dispatch("ADDON_EDITOR_CHANGE_SCRIPT", self:GetChecked())
+  end)
+
   scope.editor.save = CreateFrame("button", nil, scope.editor, "UIPanelButtonTemplate")
   scope.editor.save:SetText("Save")
   scope.editor.save:SetSize(80, 24)
@@ -122,7 +128,8 @@ function scope.InitializeEditor(e, ...)
 
   scope.editor.icon:SetPoint("TOPLEFT", 16, -14)
   scope.editor.name:SetPoint("TOPLEFT", 64, -31)
-  scope.editor.name:SetPoint("TOPRIGHT", -180, -31)
+  scope.editor.name:SetPoint("TOPRIGHT", -245, -31)
+  scope.editor.script:SetPoint("TOPLEFT", scope.editor.name, "TOPRIGHT", 4, 2)
   scope.editor.undo:SetPoint("TOPRIGHT", scope.editor.save, "TOPLEFT", -4, 0)
   scope.editor.save:SetPoint("TOPRIGHT", -12, -31)
 
@@ -151,6 +158,7 @@ function scope.EditorSelect(e, binding, index, ...)
     scope.editor.body:SetText(scope.editor.action.text)
     scope.editor.name:SetText(scope.editor.action.id)
     scope.editor.icon.icon:SetTexture(scope.editor.action.icon)
+    scope.editor.script:SetChecked(scope.editor.action.script)
     scope.editor.save:SetEnabled(false)
     scope.editor.undo:SetEnabled(false)
     scope.editor.done:SetEnabled(true)
@@ -160,7 +168,10 @@ end
 
 function scope.EditorUpdateButtons(e, ...)
   if scope.editor.action then
-    scope.editor.dirty = (scope.editor.action.text ~= scope.editor.body:GetText()) or (scope.editor.action.id ~= scope.editor.name:GetText())
+    scope.editor.dirty
+      = (scope.editor.action.text ~= scope.editor.body:GetText())
+      or (scope.editor.action.id ~= scope.editor.name:GetText())
+      or (scope.editor.action.script ~= (scope.editor.script:GetChecked() and true or nil))
     scope.editor.save:SetEnabled(scope.editor.dirty)
     scope.editor.undo:SetEnabled(scope.editor.dirty)
     scope.editor.done:SetEnabled(not scope.editor.dirty)
@@ -173,7 +184,8 @@ function scope.EditorSave(e, ...)
   scope.editor.dirty = false
   scope.editor.action[scope.ACTION.id] = scope.editor.name:GetText()
   scope.editor.action[scope.ACTION.text] = scope.editor.body:GetText()
-  scope.SaveAction(scope.editor.binding, unpack(scope.editor.action, 1, 4))
+  scope.editor.action[scope.ACTION.script] = scope.editor.script:GetChecked() and true or nil
+  scope.SaveAction(scope.editor.binding, unpack(scope.editor.action, 1, 6))
   scope:dispatch("ADDON_EDITOR_SELECT", scope.editor.binding)
   return e(...)
 end
@@ -223,9 +235,6 @@ function scope.EditorChangeIcon(e, row, col, ...)
   return e(row, col, ...)
 end
 
---/script DEFAULT_CHAT_FRAME:AddMessage("\124cffffd000\124Hspell:214621\124h[Schism]\124h\124r");
---  |cff9d9d9d|Hitem:3299::::::::20:257::::::|h[Fractured Canine]|h|r
-
 hooksecurefunc("ChatEdit_InsertLink", function(text)
   if not text then return end
   if not scope.editor.body then return end
@@ -235,12 +244,6 @@ hooksecurefunc("ChatEdit_InsertLink", function(text)
   if MacroFrameText and MacroFrameText:IsVisible() then return end
   local info, name = string.match(text, "^|c%x+|H([^|]+)|h%[([^%]]+)%].*$")
   local kind, id = strsplit(":", info)
-  --local kind, id, name = string.match(text, "^|c%x+|H(%a+):(%d+)[|:]");
-  --print(text, kind, id, type(id))
-  --print("test", test)
-  --print("name", name)
-  --print("split", )
-
   if kind == "item" then
     text = GetItemInfo(text)
   elseif kind == "spell" and id then

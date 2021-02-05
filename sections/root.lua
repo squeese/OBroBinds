@@ -1,7 +1,6 @@
 local scope = select(2, ...)
 
 function scope.CreateRootFrame()
-  scope.secureButtons = {index = 0}
   scope.root = CreateFrame("frame", "OBroBindsRoot", UIParent, nil)
   scope.root:SetMovable(true)
   scope.root:Hide()

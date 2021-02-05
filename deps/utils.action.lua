@@ -1,18 +1,57 @@
 local scope = select(2, ...)
-scope.ACTION = { kind = 1, id = 2, name = 3, text = 3, icon = 4, locked = 5, SPELL = 6, MACRO = 6, ITEM = 6, BLOB = 6 }
+scope.ACTION = { kind = 1, id = 2, name = 3, text = 3, icon = 4, locked = 5, script = 6, SPELL = 7, MACRO = 7, ITEM = 7, BLOB = 7 }
 
 function scope.ACTION:__index(key)
   if self == scope.empty then return end
   local val = scope.ACTION[key]
   if type(val) ~= 'number' then
     return val
-  elseif val == 6 then
+  elseif val == 7 then
     return rawget(self, 1) == key
   else
     return rawget(self, val)
   end
   return value
 end
+
+scope.secureButtons = { index = 0 }
+
+function scope.secureButtons:next(binding)
+  local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
+  if index then
+    print("next, reuse", index)
+    local button = self[tonumber(index)]
+    if button.stack then
+      local event = scope.push(setmetatable(table.remove(scope.pool) or {}, scope.EVENT), button.stack)
+      scope.poolPush(event, event())
+      button.stack = scope.poolPush(button.stack, nil)
+    end
+    return button
+  end
+  self.index = self.index + 1
+  if self.index > #self then
+    local button = CreateFrame("Button", "OBroBindsSecureBlobButton"..self.index, nil, "SecureActionButtonTemplate")
+    button:RegisterForClicks("AnyUp")
+    button:SetAttribute("type", "macro")
+    button.command = "CLICK "..button:GetName()..":LeftButton"
+    table.insert(self, button)
+  end
+  return self[self.index]
+end
+
+function scope.secureButtons:release(binding)
+  local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
+  if index then
+    if button.stack then
+      local event = scope.push(setmetatable(table.remove(scope.pool) or {}, scope.EVENT), button.stack)
+      scope.poolPush(event, event())
+      button.stack = scope.poolPush(button.stack, nil)
+    end
+    table.insert(self, table.remove(self, tonumber(index)))
+    self.index = self.index - 1
+  end
+end
+
 
 function scope.ACTION:SetOverrideBinding(binding)
   if self.SPELL then
@@ -21,18 +60,36 @@ function scope.ACTION:SetOverrideBinding(binding)
     SetOverrideBindingMacro(scope.root, false, binding, self.name)
   elseif self.ITEM then
     SetOverrideBindingItem(scope.root, false, binding, self.name)
-  elseif self.BLOB then
-    scope.secureButtons.index = scope.secureButtons.index + 1
-    if scope.secureButtons.index > #scope.secureButtons then
-      local button = CreateFrame("Button", "OBroBindsSecureBlobButton"..scope.secureButtons.index, nil, "SecureActionButtonTemplate")
-      button:RegisterForClicks("AnyUp")
-      button:SetAttribute("type", "macro")
-      button.command = "CLICK "..button:GetName()..":LeftButton"
-      table.insert(scope.secureButtons, button)
+
+  elseif self.BLOB and self.script then
+    local button = scope.secureButtons:next(binding)
+    if not button.update then
+      button.update = function(text)
+        if InCombatLockdown() then
+          return
+        end
+        button:SetAttribute("macrotext", text)
+      end
     end
-    local button = scope.secureButtons[scope.secureButtons.index]
+    -- TODO: pcall
+    local init, err = loadstring([[
+      local STACK, update = ...
+    ]]..self.text)
+    if err then
+      print("Error making script ("..binding.."): ", err)
+    else
+      button.stack = scope.push(setmetatable(table.remove(scope.pool) or {}, scope.STACK), init(scope.STACK, button.update))
+      local event = scope.push(setmetatable(table.remove(scope.pool) or {}, scope.EVENT), button.stack)
+      -- TODO: pcall
+      scope.poolPush(event, event())
+      SetOverrideBinding(scope.root, false, binding, button.command)
+    end
+
+  elseif self.BLOB then
+    local button = scope.secureButtons:next(binding)
     button:SetAttribute("macrotext", self.text)
     SetOverrideBinding(scope.root, false, binding, button.command)
+
   else
     SetOverrideBinding(scope.root, false, binding, nil)
   end
@@ -82,12 +139,7 @@ end
 
 function scope.DeleteAction(binding)
   OBroBindsDB = scope.write(OBroBindsDB, scope.class, scope.spec, binding, nil)
-  local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
-  if index then
-    scope.secureButtons.index = scope.secureButtons.index - 1
-    local button = table.remove(scope.secureButtons, tonumber(index))
-    table.insert(scope.secureButtons, button)
-  end
+  scope.secureButtons:release(binding)
   SetOverrideBinding(scope.root, false, binding, nil)
   scope:dispatch("ADDON_BINDING_UPDATED", binding)
 end

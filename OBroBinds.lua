@@ -19,7 +19,7 @@ scope.enqueue("ADDON_ROOT_SHOW", setmetatable({
   scope.STACK.init, function(e, ...)
     scope:dispatch("ADDON_KEYBOARD_SHOW")
     --scope:dispatch("ADDON_EDITOR_SHOW")
-    --scope:dispatch("ADDON_EDITOR_SELECT", "A")
+    --scope:dispatch("ADDON_EDITOR_SELECT", "SHIFT-3")
     return e(...)
   end,
   scope.STACK.call, scope.STACK.apply(scope.root, scope.root.Show),
@@ -72,9 +72,22 @@ scope.enqueue("ADDON_EDITOR_SHOW", setmetatable({
   scope.STACK.undo, scope.STACK.apply(scope, scope.read, "editor", scope.root.Hide),
   scope.STACK.undo, scope.EditorCleanup,
   scope.STACK.init, scope.InitializeEditor,
-  scope.STACK.enqueue, "ADDON_EDITOR_SELECT",       scope.EditorSelect,
-  scope.STACK.enqueue, "ADDON_EDITOR_BODY_CHANGED", scope.EditorUpdateButtons,
-  scope.STACK.enqueue, "ADDON_EDITOR_NAME_CHANGED", scope.EditorUpdateButtons,
-  scope.STACK.enqueue, "ADDON_EDITOR_SAVE",         scope.EditorSave,
-  scope.STACK.enqueue, "ADDON_EDITOR_UNDO",         scope.EditorUndo,
+  scope.STACK.call, function(e, ...)
+    scope.editor.__height = scope.root:GetHeight()
+    scope.root:SetHeight(500)
+    return e(...)
+  end,
+  scope.STACK.undo, function(e, ...)
+    scope.root:SetHeight(scope.editor.__height)
+    scope.editor.__height = nil
+    return e(...)
+  end,
+  scope.STACK.enqueue, "ADDON_EDITOR_SELECT",        scope.EditorSelect,
+  scope.STACK.enqueue, "ADDON_EDITOR_BODY_CHANGED",  scope.EditorUpdateButtons,
+  scope.STACK.enqueue, "ADDON_EDITOR_NAME_CHANGED",  scope.EditorUpdateButtons,
+  scope.STACK.enqueue, "ADDON_EDITOR_CHANGE_SCRIPT", scope.EditorUpdateButtons,
+  scope.STACK.enqueue, "ADDON_EDITOR_ICONS",         scope.EditorToggleIcons,
+  scope.STACK.enqueue, "ADDON_EDITOR_CHANGE_ICON",   scope.EditorChangeIcon,
+  scope.STACK.enqueue, "ADDON_EDITOR_SAVE",          scope.EditorSave,
+  scope.STACK.enqueue, "ADDON_EDITOR_UNDO",          scope.EditorUndo,
 }, scope.STACK))
