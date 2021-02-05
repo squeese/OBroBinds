@@ -1,26 +1,39 @@
 local scope = select(2, ...)
-local mixin
-local MACRO_ICON_FILENAMES = {}
 
 OBroBindsLineMixin = {}
+
+local function OnClickIcon(self)
+  scope:dispatch("ADDON_EDITOR_CHANGE_ICON", self:GetParent().listIndex, self.index)
+end
 
 function OBroBindsLineMixin:InitElement(...)
   self.HighlightTexture:Hide()
   self:SetNormalTexture(nil)
   local prev
-  for _, icon in ipairs(self.Icons) do
+  for index, icon in ipairs(self.Icons) do
+    icon.index = index
+    icon:SetScript("OnClick", OnClickIcon)
     if prev then
       icon:SetPoint("LEFT", prev, "RIGHT", 4, 0)
     else
       icon:SetPoint("LEFT", 4, 0)
     end
     prev = icon
-    icon.icon:SetTexture(136202)
   end
 end
 
 function OBroBindsLineMixin:UpdateDisplay()
-  --self.Text:SetText(self.listIndex)
+  local count = #scope.editor.iconFiles
+  local base = self.listIndex-1
+  for i = 1, 5 do
+    local index = base*5+i
+    if index > count then
+      self.Icons[i]:Hide()
+    else
+      self.Icons[i]:Show()
+      self.Icons[i].icon:SetTexture(scope.editor.iconFiles[index])
+    end
+  end
 end
 
 OBroBindsListMixin = {}
@@ -28,23 +41,25 @@ OBroBindsListMixin = {}
 function OBroBindsListMixin:OnLoad()
   self.ArtOverlay.SelectedHighlight:SetAlpha(0)
   self.InsetFrame:Hide()
-  --self.ScrollFrame.scrollBar.Background:Hide()
+  self.ScrollFrame.scrollBar.Background:Hide()
+  self.ScrollFrame.scrollBar.ScrollBarTop:Hide()
+  self.ScrollFrame.scrollBar.ScrollBarMiddle:Hide()
+  self.ScrollFrame.scrollBar.ScrollBarBottom:Hide()
   self:SetPoint("TOPLEFT", 18, -68)
   self:SetPoint("BOTTOMRIGHT", self:GetParent(), "BOTTOMLEFT", 256, 52)
   self:SetElementTemplate("OBroBindsLineTemplate")
   self:SetGetNumResultsFunction(function(...)
-    return 32 
+    return math.ceil(#scope.editor.iconFiles / 5)
   end)
 end
 
 function scope.InitializeEditor(e, ...)
-  do
-    local list = CreateFrame("frame", nil, scope.editor, "OBroBindsListTemplate")
-  end
+  scope.editor.iconFiles = nil
+  scope.editor.iconScroll = nil
 
   scope.editor.scroll = CreateFrame("ScrollFrame", nil, scope.editor, "OBroBindsEditorTemplate")
   scope.editor.scroll:SetPoint("TOPLEFT", 18, -68)
-  scope.editor.scroll:SetPoint("TOPLEFT", scope.editor:GetWidth()/2, -68)
+  --scope.editor.scroll:SetPoint("TOPLEFT", scope.editor:GetWidth()/2, -68)
 
   scope.editor.body = scope.editor.scroll.edit
   scope.editor.body:SetPoint("TOPLEFT", 0, 0)
@@ -69,11 +84,7 @@ function scope.InitializeEditor(e, ...)
   scope.editor.icon.icon:SetTexture(136202)
   scope.editor.icon:SetSize(40, 40)
   scope.editor.icon:SetScript("OnClick", function(self)
-    if self:GetChecked() then
-      scope:dispatch("ADDON_EDITOR_SHOW_ICONS")
-    else
-      scope:dispatch("ADDON_EDITOR_HIDE_ICONS")
-    end
+    scope:dispatch("ADDON_EDITOR_ICONS", self:GetChecked())
   end)
 
   scope.editor.name = CreateFrame("editbox", nil, scope.editor, "InputBoxTemplate")
@@ -139,18 +150,10 @@ function scope.EditorSelect(e, binding, index, ...)
     scope.editor.binding = binding
     scope.editor.body:SetText(scope.editor.action.text)
     scope.editor.name:SetText(scope.editor.action.id)
+    scope.editor.icon.icon:SetTexture(scope.editor.action.icon)
     scope.editor.save:SetEnabled(false)
     scope.editor.undo:SetEnabled(false)
     scope.editor.done:SetEnabled(true)
-    --if not index then
-      --for key, value in ipairs(scope.selector.bindings) do
-        --if binding == value then
-          --index = key
-          --break
-        --end
-      --end
-    --end
-    --TemplatedListMixin.SetSelectedListIndex(scope.selector.list, index, false)
     return e(binding, index, ...)
   end
 end
@@ -188,7 +191,72 @@ function scope.EditorCleanup(e, ...)
   scope.editor.binding = nil
   scope.editor.body:SetText("")
   scope.editor.name:SetText("")
-  --TemplatedListMixin.SetSelectedListIndex(scope.selector.list, -1, false)
   return e(...)
 end
 
+function scope.EditorToggleIcons(e, open, ...)
+  if not scope.editor.iconScroll then
+    scope.editor.iconFiles = {134400}
+    GetMacroIcons(scope.editor.iconFiles)
+    scope.editor.iconScroll = CreateFrame("frame", nil, scope.editor, "OBroBindsListTemplate")
+  end
+  if open then
+    scope.editor.iconScroll:Show()
+    scope.editor.scroll:SetPoint("TOPLEFT", scope.editor.iconScroll, "TOPRIGHT", 8, 0)
+  else
+    scope.editor.iconScroll:Hide()
+    scope.editor.scroll:SetPoint("TOPLEFT", scope.editor, "TOPLEFT", 18, -68)
+  end
+  return e(open, ...)
+end
+
+function scope.EditorChangeIcon(e, row, col, ...)
+  local icon = scope.editor.iconFiles[(row-1)*5+col]
+  if icon == 134400 then
+    local macro = CreateMacro("__TMP", "INV_MISC_QUESTIONMARK", scope.editor.body:GetText())
+    _, icon = GetMacroInfo(macro)
+    DeleteMacro(macro)
+  end
+  scope.editor.icon.icon:SetTexture(icon)
+  scope.dbWrite(scope.class, scope.spec, scope.editor.binding, scope.ACTION.icon, icon)
+  scope:dispatch("ADDON_BINDING_UPDATED", scope.editor.binding)
+  return e(row, col, ...)
+end
+
+--/script DEFAULT_CHAT_FRAME:AddMessage("\124cffffd000\124Hspell:214621\124h[Schism]\124h\124r");
+--  |cff9d9d9d|Hitem:3299::::::::20:257::::::|h[Fractured Canine]|h|r
+
+hooksecurefunc("ChatEdit_InsertLink", function(text)
+  if not text then return end
+  if not scope.editor.body then return end
+  if not scope.editor:IsVisible() then return end
+  if ChatEdit_GetActiveWindow() then return end
+  if BrowseName and BrowseName:IsVisible() then return end
+  if MacroFrameText and MacroFrameText:IsVisible() then return end
+  local info, name = string.match(text, "^|c%x+|H([^|]+)|h%[([^%]]+)%].*$")
+  local kind, id = strsplit(":", info)
+  --local kind, id, name = string.match(text, "^|c%x+|H(%a+):(%d+)[|:]");
+  --print(text, kind, id, type(id))
+  --print("test", test)
+  --print("name", name)
+  --print("split", )
+
+  if kind == "item" then
+    text = GetItemInfo(text)
+  elseif kind == "spell" and id then
+    text = GetSpellInfo(id)
+  elseif kind == "talent" and name then
+    text = GetSpellInfo(name) or name
+  end
+  if scope.editor.body:GetText() == "" then
+    if kind == "item" then
+      if GetItemSpell(text) then
+        return scope.editor.body:Insert(SLASH_USE1.." "..text);
+      end
+      return scope.editor.body:Insert(SLASH_EQUIP1.." "..text);
+    elseif kind == "spell" or kind == "talent" then
+      return scope.editor.body:Insert(SLASH_CAST1.." "..text);
+    end
+  end
+  scope.editor.body:Insert(text)
+end)

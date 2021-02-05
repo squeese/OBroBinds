@@ -8,7 +8,6 @@ function scope.CreateRootFrame()
   scope.root:SetScript("OnEvent", scope.dispatch)
   function _G.OBroBinds_Toggle()
     local visible = scope.root:IsVisible()
-    print("visible", visible)
     scope.dbWrite("GUI", "open", not visible and true or nil)
     scope:dispatch(visible and 'ADDON_ROOT_HIDE' or 'ADDON_ROOT_SHOW')
   end

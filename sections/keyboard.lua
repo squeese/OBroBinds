@@ -34,7 +34,7 @@ do
     scope.stances = nil
     if scope.class == "ROGUE" then
       scope.write(scope, 'stances', scope.push, CreateStanceButton(73,  'ability_stealth',            1, 2, 3))
-    elseif true or scope.class == "DRUID" then
+    elseif scope.class == "DRUID" then
       scope.write(scope, 'stances', scope.push, CreateStanceButton(97,  'ability_racial_bearform',    1, 2, 3, 4))
       scope.write(scope, 'stances', scope.push, CreateStanceButton(73,  'ability_druid_catform',      1, 2, 3, 4))
       scope.write(scope, 'stances', scope.push, CreateStanceButton(109, 'spell_nature_forceofnature', 1))
@@ -88,6 +88,12 @@ do
     button.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
     button.AutoCastable:SetScale(0.4)
     button.AutoCastable:SetAlpha(0.75)
+    button.kind = button:CreateTexture(nil, "OVERLAY")
+    button.kind:SetPoint("BOTTOMLEFT", 0, 0)
+    button.kind:SetPoint("TOPRIGHT", button, "BOTTOMRIGHT", 0, 14)
+    --button.kind:SetSize(12, 12)
+    --button.kind:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+    button.kind:SetColorTexture(0, 0, 0, 0.75)
     return button
   end
 end
@@ -98,7 +104,9 @@ do
     self.binding = binding
     if scope.mainbar[binding] then
       local kind, id = GetActionInfo(scope.mainbar[binding] + scope.offset - 1)
-      self.Border:Show()
+      --self.Border:Show()
+      self.SpellHighlightTexture:Show()
+      self.kind:Hide()
       self.Name:SetText(scope.mainbar[binding])
       self.icon:SetVertexColor(1, 1, 1, 1)
       if kind == 'spell' then
@@ -111,7 +119,8 @@ do
         self.icon:SetTexture(nil)
       end
     else
-      self.Border:Hide()
+      --self.Border:Hide()
+      self.SpellHighlightTexture:Hide()
       self.Name:SetText()
       local action = scope.GetAction(binding)
       local command = GetBindingAction(binding, false)
@@ -157,6 +166,13 @@ do
       else
         self.LevelLinkLockIcon:Hide()
       end
+      if action.BLOB then
+        self.kind:Show()
+        self.Name:SetText(action.id)
+      else
+        self.kind:Hide()
+        --self.Name:SetText("")
+      end
     end
   end
 
@@ -186,7 +202,7 @@ do
       local key, x, y = select(i, unpack(layout))
       button.key = key
       scope.buttons[key] = button
-      button:SetPoint("TOPLEFT", x, -y-58)
+      button:SetPoint("TOPLEFT", x, -y-20)
       button.Border:Hide()
       button.Border:SetAlpha(1)
       button.HotKey:SetText(key)
@@ -216,7 +232,7 @@ function scope.UpdateKeyboardStanceButtons(e, ...)
         button:Show()
         button:ClearAllPoints()
         if not prev then
-          button:SetPoint("LEFT", scope.keyboard, "TOPLEFT", 0, -36)
+          button:SetPoint("TOPLEFT", scope.keyboard, "BOTTOMLEFT", 0, -10)
         else
           button:SetPoint("LEFT", prev, "RIGHT", 4, 0)
         end
@@ -315,6 +331,9 @@ do
       end
     elseif action.BLOB then
       GameTooltip:SetText("BLOB "..action.id)
+      GameTooltip:AddLine(action.name)
+      GameTooltip:Show()
+
     elseif GetBindingAction(binding, false) ~= "" then
       GameTooltip:SetText(GetBindingAction(binding, false))
     elseif GetBindingAction(binding, true) ~= "" then
@@ -341,7 +360,7 @@ function scope.UpdateUnknownSpells(e, ...)
   for binding, action in scope.GetActions() do
     if action.SPELL and not action.id then
       local icon, _, _, _, id = select(3, GetSpellInfo(action.name))
-      action[1], action[4] = id, icon or action.icon
+      action[2], action[4] = id, icon or action.icon
     end
   end
   return e(...)
