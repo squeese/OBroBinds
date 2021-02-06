@@ -6,11 +6,8 @@
   <Script file="deps\layouts.lua" />
   <Script file="sections\root.lua" />
   <Script file="sections\keyboard.lua" />
-  <!--
   <Script file="sections\editor.lua" />
-  -->
 
-  <!--
   <Button name="OBroBindsLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTemplate" virtual="true">
     <Size>
       <AbsDimension y="40" />
@@ -58,7 +55,6 @@
       </OnLoad>
     </Scripts>
   </ScrollFrame>
-  -->
 
   <Script file="OBroBinds.lua" />
 </Ui>

@@ -87,8 +87,8 @@ do
     return e(...)
   end
   function scope.PickupAction(binding)
-    if scope.mainbar[binding] then
-      PickupAction(scope.mainbar[binding] + scope.offset - 1)
+    if scope.PORTAL_BUTTONS[binding] then
+      PickupAction(scope.PORTAL_BUTTONS[binding] + scope.STANCE_OFFSET - 1)
       return
     end
     local action = scope.GetAction(binding)
@@ -121,8 +121,8 @@ do
 end
 
 function scope.ReceiveAction(binding)
-  if scope.mainbar[binding] then
-    PlaceAction(scope.mainbar[binding] + scope.offset - 1)
+  if scope.PORTAL_BUTTONS[binding] then
+    PlaceAction(scope.PORTAL_BUTTONS[binding] + scope.STANCE_OFFSET - 1)
     return
   end
   if not scope.GetAction(binding).locked then

@@ -1,5 +1,6 @@
 local scope = select(2, ...)
 
+--[[
 OBroBindsLineMixin = {}
 
 local function OnClickIcon(self)
@@ -52,103 +53,8 @@ function OBroBindsListMixin:OnLoad()
     return math.ceil(#scope.editor.iconFiles / 5)
   end)
 end
+]]
 
-function scope.InitializeEditor(e, ...)
-  scope.editor.iconFiles = nil
-  scope.editor.iconScroll = nil
-
-  scope.editor.scroll = CreateFrame("ScrollFrame", nil, scope.editor, "OBroBindsEditorTemplate")
-  scope.editor.scroll:SetPoint("TOPLEFT", 18, -68)
-  --scope.editor.scroll:SetPoint("TOPLEFT", scope.editor:GetWidth()/2, -68)
-
-  scope.editor.body = scope.editor.scroll.edit
-  scope.editor.body:SetPoint("TOPLEFT", 0, 0)
-  scope.editor.body:SetSize(scope.editor.scroll:GetWidth(), scope.editor.scroll:GetHeight())
-  scope.editor.body:SetScript("OnTextChanged", function(self)
-    ScrollingEdit_OnTextChanged(self, self:GetParent())
-    scope:dispatch("ADDON_EDITOR_BODY_CHANGED")
-  end)
-
-  local button = CreateFrame("button", nil, scope.editor)
-  button:SetAllPoints(scope.editor.scroll)
-  button:SetScript("OnClick", function()
-    scope.editor.body:SetFocus()
-  end)
-
-  local top = scope.editor:CreateTexture(nil, "BACKGROUND")
-  top:SetPoint("TOPLEFT", 8, -22)
-  top:SetPoint("BOTTOMRIGHT", scope.editor, "TOPRIGHT", -8, -62)
-  top:SetColorTexture(0, 0, 0, 0.5)
-
-  scope.editor.icon = CreateFrame("checkbutton", nil, scope.editor, "ActionButtonTemplate")
-  scope.editor.icon.icon:SetTexture(136202)
-  scope.editor.icon:SetSize(40, 40)
-  scope.editor.icon:SetScript("OnClick", function(self)
-    scope:dispatch("ADDON_EDITOR_ICONS", self:GetChecked())
-  end)
-
-  scope.editor.name = CreateFrame("editbox", nil, scope.editor, "InputBoxTemplate")
-  scope.editor.name:SetHeight(24)
-  scope.editor.name:SetAutoFocus(false)
-  scope.editor.name:SetScript("OnEscapePressed", function(self)
-    self:ClearFocus()
-  end)
-  scope.editor.name:SetScript("OnTextChanged", function(self)
-    scope:dispatch("ADDON_EDITOR_NAME_CHANGED")
-  end)
-  local line = scope.editor.name:CreateTexture(nil, "BACKGROUND")
-  line:SetPoint("BOTTOMLEFT", 0, 0)
-  line:SetPoint("TOPRIGHT", scope.editor.name, "BOTTOMRIGHT", 0, 1)
-  line:SetColorTexture(1, 1, 1, 0.25)
-  scope.editor.name.Left:Hide()
-  scope.editor.name.Right:Hide()
-  scope.editor.name.Middle:Hide()
-
-  scope.editor.script = CreateFrame("checkbutton", nil, scope.editor, "UICheckButtonTemplate")
-  scope.editor.script.text:SetText("Script")
-  scope.editor.script:SetScript("OnClick", function(self)
-    scope:dispatch("ADDON_EDITOR_CHANGE_SCRIPT", self:GetChecked())
-  end)
-
-  scope.editor.save = CreateFrame("button", nil, scope.editor, "UIPanelButtonTemplate")
-  scope.editor.save:SetText("Save")
-  scope.editor.save:SetSize(80, 24)
-  scope.editor.save:SetEnabled(false)
-  scope.editor.save:SetScript("OnClick", function()
-    scope:dispatch("ADDON_EDITOR_SAVE")
-  end)
-
-  scope.editor.undo = CreateFrame("button", nil, scope.editor, "UIPanelButtonTemplate")
-  scope.editor.undo:SetText("Cancel")
-  scope.editor.undo:SetSize(80, 24)
-  scope.editor.undo:SetEnabled(false)
-  scope.editor.undo:SetScript("OnClick", function()
-    scope:dispatch("ADDON_EDITOR_UNDO")
-  end)
-
-  scope.editor.icon:SetPoint("TOPLEFT", 16, -14)
-  scope.editor.name:SetPoint("TOPLEFT", 64, -31)
-  scope.editor.name:SetPoint("TOPRIGHT", -245, -31)
-  scope.editor.script:SetPoint("TOPLEFT", scope.editor.name, "TOPRIGHT", 4, 2)
-  scope.editor.undo:SetPoint("TOPRIGHT", scope.editor.save, "TOPLEFT", -4, 0)
-  scope.editor.save:SetPoint("TOPRIGHT", -12, -31)
-
-  local bg = scope.editor:CreateTexture(nil, "BACKGROUND")
-  bg:SetPoint("TOPLEFT", scope.editor, "BOTTOMLEFT", 8, 48)
-  bg:SetPoint("BOTTOMRIGHT", -8, 8)
-  bg:SetColorTexture(0, 0, 0, 0.5)
-
-  scope.editor.done = CreateFrame("button", nil, scope.editor, "UIPanelButtonTemplate")
-  scope.editor.done:SetText("Close")
-  scope.editor.done:SetSize(80, 24)
-  scope.editor.done:SetEnabled(true)
-  scope.editor.done:SetScript("OnClick", function()
-    scope:dispatch("ADDON_KEYBOARD_SHOW")
-  end)
-  scope.editor.done:SetPoint("BOTTOMRIGHT", -12, 16)
-
-  return e(...)
-end
 
 function scope.EditorSelect(e, binding, index, ...)
   if not scope.editor.dirty then
@@ -166,6 +72,7 @@ function scope.EditorSelect(e, binding, index, ...)
   end
 end
 
+--[[
 function scope.EditorUpdateButtons(e, ...)
   if scope.editor.action then
     scope.editor.dirty
@@ -234,6 +141,7 @@ function scope.EditorChangeIcon(e, row, col, ...)
   scope:dispatch("ADDON_BINDING_UPDATED", scope.editor.binding)
   return e(row, col, ...)
 end
+]]
 
 hooksecurefunc("ChatEdit_InsertLink", function(text)
   if not text then return end

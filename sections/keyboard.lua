@@ -21,12 +21,12 @@ end
 
 do
   local function OnClick(self)
-    scope.OFFSET = self.OFFSET ~= scope.OFFSET and self.OFFSET or 1
+    scope.STANCE_OFFSET = self.STANCE_OFFSET ~= scope.STANCE_OFFSET and self.STANCE_OFFSET or 1
     scope:dispatch("ADDON_OFFSET_CHANGED")
   end
   local function CreateStanceButton(offset, icon, ...)
-    local button = CreateFrame("button", nil, scope.keyboard, "ActionButtonTemplate")
-    button.OFFSET = offset
+    local button = CreateFrame("button", nil, scope.KEYBOARD, "ActionButtonTemplate")
+    button.STANCE_OFFSET = offset
     button:RegisterForClicks("AnyUp")
     button:SetScript("OnClick", OnClick)
     button.icon:SetTexture("Interface/Icons/"..icon)
@@ -35,99 +35,26 @@ do
   function scope.InitializeKeyboardStanceButtons()
     scope.InitializeKeyboardStanceButtons = nil
     if scope.CLASS == "ROGUE" then
-      scope.write(scope, 'STANCES', scope.push, CreateStanceButton(73,  'ability_stealth',            1, 2, 3))
-    elseif scope.CLASS == "DRUID" then
-      scope.write(scope, 'STANCES', scope.push, CreateStanceButton(97,  'ability_racial_bearform',    1, 2, 3, 4))
-      scope.write(scope, 'STANCES', scope.push, CreateStanceButton(73,  'ability_druid_catform',      1, 2, 3, 4))
-      scope.write(scope, 'STANCES', scope.push, CreateStanceButton(109, 'spell_nature_forceofnature', 1))
+      scope.write(scope, 'STANCE_BUTTONS', scope.push, CreateStanceButton(73,  'ability_stealth',            1, 2, 3))
+    elseif true or scope.CLASS == "DRUID" then
+      scope.write(scope, 'STANCE_BUTTONS', scope.push, CreateStanceButton(97,  'ability_racial_bearform',    1, 2, 3, 4))
+      scope.write(scope, 'STANCE_BUTTONS', scope.push, CreateStanceButton(73,  'ability_druid_catform',      1, 2, 3, 4))
+      scope.write(scope, 'STANCE_BUTTONS', scope.push, CreateStanceButton(109, 'spell_nature_forceofnature', 1))
     end
   end
 end
 
 
-
-
-    --return next(scope.DEFAULT_KEYBOARD_LAYOUT, ...)
-  --end
---end
-
---[[
 local CreateActionButton
 do
-  local function OnEnter(self)
-    scope:dispatch("ADDON_SHOW_TOOLTIP", self)
-  end
-  local function OnLeave()
-    GameTooltip:Hide()
-  end
-  local function OnDragStart(self)
-    if InCombatLockdown() then return end
-    scope.PickupAction(self.binding)
-    self:UpdateButton()
-  end
-  local function OnReceiveDrag(self)
-    if InCombatLockdown() then return end
-    scope.ReceiveAction(self.binding)
-    self:UpdateButton()
-  end
-  local function OnClick(self, button)
-    if InCombatLockdown() then return end
-    if button == "RightButton" then
-      local binding = scope.modifier..self.key
-      if not scope.mainbar[binding] then
-        scope:dispatch("ADDON_SHOW_DROPDOWN", self)
-      end
-    elseif GetCursorInfo() then
-      scope.ReceiveAction(self.binding)
-      self:UpdateButton()
-    end
-  end
-  function CreateActionButton()
-    local button = CreateFrame("button", nil, scope.keyboard, "ActionButtonTemplate")
-    button:SetScript("OnEnter", OnEnter)
-    button:SetScript("OnLeave", OnLeave)
-    button:SetScript("OnDragStart", OnDragStart)
-    button:SetScript("OnReceiveDrag", OnReceiveDrag)
-    button:SetScript("OnClick", OnClick)
-    button:RegisterForDrag("LeftButton")
-    button:RegisterForClicks("AnyUp")
-    button.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
-    button.AutoCastable:SetTexCoord(0.15, 0.6, 0.6, 0.15)
-    button.AutoCastable:ClearAllPoints()
-    button.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
-    button.AutoCastable:SetScale(0.4)
-    button.AutoCastable:SetAlpha(0.75)
-    button.kind = button:CreateTexture(nil, "OVERLAY")
-    button.kind:SetPoint("BOTTOMLEFT", 0, 0)
-    button.kind:SetPoint("TOPRIGHT", button, "BOTTOMRIGHT", 0, 14)
-    button.kind:SetColorTexture(0, 0, 0, 0.75)
-    return button
-  end
-end
-
---function scope.ACTION:Icon()
-  --if self.SPELL then
-    --return select(3, GetSpellInfo(self.id)) or self.icon 
-  --elseif self.MACRO then
-    --return select(2, GetMacroInfo(self.name)) or self.icon
-  --elseif self.ITEM then
-    --return select(10, GetItemInfo(self.id or 0)) or self.icon
-  --elseif self.BLOB then
-    --return self.icon or 441148
-  --end
-  --return self.icon or nil
---end
-
-do
-  local function UpdateButton(self)
-    local binding = scope.modifier..self.key
+  local function UpdateActionButton(self)
+    local binding = scope.MODIFIER..self.key
     self.binding = binding
-    if scope.mainbar[binding] then
-      local kind, id = GetActionInfo(scope.mainbar[binding] + scope.offset - 1)
-      --self.Border:Show()
+    if scope.PORTAL_BUTTONS[binding] then
+      local kind, id = GetActionInfo(scope.PORTAL_BUTTONS[binding] + scope.STANCE_OFFSET - 1)
       self.SpellHighlightTexture:Show()
       self.kind:Hide()
-      self.Name:SetText(scope.mainbar[binding])
+      self.Name:SetText(scope.PORTAL_BUTTONS[binding])
       self.icon:SetVertexColor(1, 1, 1, 1)
       if kind == 'spell' then
         self.icon:SetTexture(select(3, GetSpellInfo(id)))
@@ -139,13 +66,12 @@ do
         self.icon:SetTexture(nil)
       end
     else
-      --self.Border:Hide()
       self.SpellHighlightTexture:Hide()
       self.Name:SetText()
       local action = scope.GetAction(binding)
       local command = GetBindingAction(binding, false)
       local hasCommand = command ~= ""
-      local icon = action.kind and action:Icon()
+      local icon = action.kind and scope.ActionIcon(action)
       if icon then
         self.icon:SetVertexColor(1, 1, 1, 1)
         self.icon:SetTexture(icon)
@@ -181,47 +107,100 @@ do
       else
         self.AutoCastable:Hide()
       end
-      if action.locked then
+      if action.lock then
         self.LevelLinkLockIcon:Show()
       else
         self.LevelLinkLockIcon:Hide()
       end
-      if action.BLOB then
+      if action.blob then
         self.kind:Show()
         self.Name:SetText(action.id)
       else
         self.kind:Hide()
-        --self.Name:SetText("")
       end
     end
   end
+  local function OnEnter(self)
+    scope:dispatch("ADDON_SHOW_TOOLTIP", self)
+  end
+  local function OnLeave()
+    GameTooltip:Hide()
+  end
+  local function OnDragStart(self)
+    if InCombatLockdown() then return end
+    if scope.PickupAction(self.binding) then
+      self:Update()
+    end
+  end
+  local function OnReceiveDrag(self)
+    if InCombatLockdown() then return end
+    if scope.ReceiveAction(self.binding) then
+      self:Update()
+    end
+  end
+  local function OnClick(self, button)
+    if InCombatLockdown() then return end
+    if button == "RightButton" then
+      local binding = scope.MODIFIER..self.key
+      if not scope.PORTAL_BUTTONS[binding] then
+        scope:dispatch("ADDON_SHOW_DROPDOWN", self)
+      end
+    elseif GetCursorInfo() and scope.ReceiveAction(self.binding) then
+      self:Update()
+    end
+  end
+  function CreateActionButton()
+    local button = CreateFrame("button", nil, scope.KEYBOARD, "ActionButtonTemplate")
+    button:SetScript("OnEnter", OnEnter)
+    button:SetScript("OnLeave", OnLeave)
+    button:SetScript("OnDragStart", OnDragStart)
+    button:SetScript("OnReceiveDrag", OnReceiveDrag)
+    button:SetScript("OnClick", OnClick)
+    button.Update = UpdateActionButton
+    button:RegisterForDrag("LeftButton")
+    button:RegisterForClicks("AnyUp")
+    button.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
+    button.AutoCastable:SetTexCoord(0.15, 0.6, 0.6, 0.15)
+    button.AutoCastable:ClearAllPoints()
+    button.AutoCastable:SetPoint("BOTTOMLEFT", -14, -12)
+    button.AutoCastable:SetScale(0.4)
+    button.AutoCastable:SetAlpha(0.75)
+    button.kind = button:CreateTexture(nil, "OVERLAY")
+    button.kind:SetPoint("BOTTOMLEFT", 0, 0)
+    button.kind:SetPoint("TOPRIGHT", button, "BOTTOMRIGHT", 0, 14)
+    button.kind:SetColorTexture(0, 0, 0, 0.75)
+    return button
+  end
+end
 
+do
   local padding, mmin, mmax = 12, math.min, math.max
-  function scope.UpdateKeyboardLayout(e, layout, ...)
-    scope.index = 0
-    scope.keyboard:ClearAllPoints()
-    scope.keyboard:SetPoint("TOPLEFT", padding, -padding)
-    scope.keyboard:SetSize(1, 1)
-    local xmin, xmax = scope.keyboard:GetLeft(), scope.keyboard:GetRight()
-    local ymin, ymax = scope.keyboard:GetBottom(), scope.keyboard:GetTop()
+  local tinsert = table.insert
+  function scope.UpdateKeyboardLayout(next, layout, ...)
+    scope.KEYBOARD:ClearAllPoints()
+    scope.KEYBOARD:SetPoint("TOPLEFT", padding, -padding)
+    scope.KEYBOARD:SetSize(1, 1)
+    scope.ACTION_BUTTONS = scope.ACTION_BUTTONS or {}
+    scope.ACTION_INDEX = 0
+    local xmin, xmax = scope.KEYBOARD:GetLeft(), scope.KEYBOARD:GetRight()
+    local ymin, ymax = scope.KEYBOARD:GetBottom(), scope.KEYBOARD:GetTop()
     local button
-    for key in pairs(scope.buttons) do
+    for key in pairs(scope.ACTION_BUTTONS) do
       if type(key) == "string" then
         scope.button[key] = nil
       end
     end
     for i = 1, #layout, 3 do
-      scope.index = scope.index + 1
-      if scope.index > #scope.buttons then
+      scope.ACTION_INDEX = scope.ACTION_INDEX + 1
+      if scope.ACTION_INDEX > #scope.ACTION_BUTTONS then
         button = CreateActionButton()
-        button.UpdateButton = UpdateButton
-        table.insert(scope.buttons, button)
+        tinsert(scope.ACTION_BUTTONS, button)
       else
-        button = scope.buttons[scope.index]
+        button = scope.ACTION_BUTTONS[scope.ACTION_INDEX]
       end
       local key, x, y = select(i, unpack(layout))
       button.key = key
-      scope.buttons[key] = button
+      scope.ACTION_BUTTONS[key] = button
       button:SetPoint("TOPLEFT", x, -y-20)
       button.Border:Hide()
       button.Border:SetAlpha(1)
@@ -232,59 +211,59 @@ do
       ymin = mmin(ymin, button:GetBottom())
       ymax = mmax(ymax, button:GetTop())
     end
-    for i = scope.index+1, #scope.buttons do
-      button = scope.buttons[scope.index]
+    for i = scope.ACTION_INDEX+1, #scope.ACTION_BUTTONS do
+      button = scope.ACTION_BUTTONS[scope.ACTION_INDEX]
       button:Hide()
     end
-    local w, h = xmax-xmin, ymax-ymin
-    scope.root:SetSize(w+padding*2, h+padding*2)
-    scope.keyboard:SetSize(w, h)
-    return e(...)
+    local width, height = xmax-xmin, ymax-ymin
+    scope.ROOT:SetSize(width+padding*2, height+padding*2)
+    scope.KEYBOARD:SetSize(width, height)
+    return next(...)
   end
 end
 
-function scope.UpdateKeyboardStanceButtons(e, ...)
-  if scope.stances then
+function scope.UpdateKeyboardStanceButtons(next, ...)
+  if scope.STANCE_BUTTONS then
     local prev
-    for _, button in ipairs(scope.stances) do
+    for _, button in ipairs(scope.STANCE_BUTTONS) do
       button:Hide()
-      if scope.match(scope.spec, unpack(button)) then
+      if scope.match(scope.SPECC, unpack(button)) then
         button:Show()
         button:ClearAllPoints()
         if not prev then
-          button:SetPoint("TOPLEFT", scope.keyboard, "BOTTOMLEFT", 0, -10)
+          button:SetPoint("TOPLEFT", scope.KEYBOARD, "BOTTOMLEFT", 0, -10)
         else
           button:SetPoint("LEFT", prev, "RIGHT", 4, 0)
         end
         button.Border:Hide()
-        if scope.offset == button.offset then
+        if scope.STANCE_OFFSET == button.STANCE_OFFSET then
           button.Border:Show()
         end
         prev = button
       end
     end
   end
-  return e(...)
+  return next(...)
 end
 
 do
-  local pattern = "^(.--?)([^-]*.)$"
+  local pattern, strmatch = "^(.--?)([^-]*.)$", string.match
   local function UpdateButton(binding)
-    local modifier, key = string.match(binding, pattern)
-    if scope.modifier == modifier then
-      scope.buttons[key]:UpdateButton()
+    local modifier, key = strmatch(binding, pattern)
+    if scope.MODIFIER == modifier then
+      scope.ACTION_BUTTONS[key]:Update()
     end
   end
-  local prev
-  function scope.UpdateKeyboardMainbarIndices(e, ...)
-    prev, scope.mainbar = scope.mainbar, scope.clean(prev or {})
+  local clean, prev = scope.clean
+  function scope.UpdateKeyboardMainbarIndices(next, ...)
+    prev, scope.PORTAL_BUTTONS = scope.PORTAL_BUTTONS, clean(prev or {})
     for index = 1, 12 do
       local binding = GetBindingKey("ACTIONBUTTON"..index)
       if binding then
-        scope.mainbar[binding] = index
+        scope.PORTAL_BUTTONS[binding] = index
         scope.DeleteAction(binding)
         if prev then
-          if prev[binding] ~= scope.mainbar[binding] then
+          if prev[binding] ~= scope.PORTAL_BUTTONS[binding] then
             UpdateButton(binding)
           end
           prev[binding] = nil
@@ -296,60 +275,67 @@ do
         UpdateButton(binding)
       end
     end
-    return e(...)
+    return next(...)
   end
 
-  function scope.UpdateKeyboardMainbarSlots(e, slot, ...)
-    local index = slot-scope.offset+1
+  function scope.UpdateKeyboardMainbarSlots(next, event, slot, ...)
+    local index = slot-scope.STANCE_OFFSET+1
     local binding = GetBindingKey("ACTIONBUTTON"..index)
     if binding and 1 <= index and index <= 12 then
-      assert(scope.mainbar[binding] == index)
+      assert(scope.PORTAL_BUTTONS[binding] == index)
       UpdateButton(binding)
     end
-    return e(slot, ...)
+    return next(event, slot, ...)
   end
 
-  function scope.UpdateKeyboardMainbarOffsets(e, ...)
-    for binding, index in pairs(scope.mainbar) do
+  function scope.UpdateKeyboardMainbarOffsets(next, ...)
+    for binding, index in pairs(scope.PORTAL_BUTTONS) do
       UpdateButton(binding)
     end
-    return e(...)
+    return next(...)
   end
 end
 
-function scope.UpdateAllKeyboardButtons(e, ...)
-  for index = 1, scope.index do
-    scope.buttons[index]:UpdateButton()
+function scope.UpdateKeyboardActionButtons(next, ...)
+  for index = 1, scope.ACTION_INDEX do
+    scope.ACTION_BUTTONS[index]:Update()
   end
-  return e(...)
+  return next(...)
+end
+
+function scope.UpdateChangedActionButtons(next, event, binding, modifier, key, ...)
+  if scope.MODIFIER == modifier then
+    scope.ACTION_BUTTONS[key]:Update()
+  end
+  return next(event, binding, modifier, key, ...)
 end
 
 do
-  local function Update(button)
+  local function UpdateButtonTooltip(button)
     if not button:IsVisible() then return end
     GameTooltip:SetOwner(button, 'ANCHOR_BOTTOMRIGHT')
-    local binding = scope.modifier..button.key
-    if scope.mainbar[binding] then
-      GameTooltip:SetAction(scope.mainbar[binding] + scope.offset - 1)
+    local binding = scope.MODIFIER..button.key
+    if scope.PORTAL_BUTTONS[binding] then
+      GameTooltip:SetAction(scope.PORTAL_BUTTONS[binding] + scope.STANCE_OFFSET - 1)
       return
     end
     local action = scope.GetAction(binding)
-    if action.SPELL then
+    if action.spell then
       if action.id and GetSpellInfo(action.id) then
         GameTooltip:SetSpellByID(action.id)
       else
         GameTooltip:SetText("SPELL "..action.name)
       end
-    elseif action.MACRO then
+    elseif action.macro then
       GameTooltip:SetText("MACRO "..action.name)
-    elseif action.ITEM then
+    elseif action.item then
       local level = select(4, GetItemInfo(action.id or 0))
       if action.id and level then
         GameTooltip:SetItemKey(action.id, level, 0)
       else
         GameTooltip:SetText("ITEM "..action.name)
       end
-    elseif action.BLOB then
+    elseif action.blob then
       GameTooltip:SetText("BLOB "..action.id)
       GameTooltip:AddLine(action.name)
       GameTooltip:Show()
@@ -363,56 +349,59 @@ do
     end
   end
   local current
-  function scope.UpdateTooltip(e, button, ...)
+  function scope.UpdateTooltip(next, event, button, ...)
     current = button
-    Update(button)
-    return e(button, ...)
+    UpdateButtonTooltip(button)
+    return next(event, button, ...)
   end
-  function scope.RefreshTooltip(e, ...)
+  function scope.RefreshTooltip(next, ...)
     if current and GetMouseFocus() == current then
-      Update(current)
+      UpdateButtonTooltip(current)
     end
-    return e(...)
+    return next(...)
   end
 end
 
-function scope.UpdateUnknownSpells(e, ...)
+function scope.UpdateUnknownSpells(next, ...)
   for binding, action in scope.GetActions() do
-    if action.SPELL and not action.id then
+    if action.spell and not action.id then
       local icon, _, _, _, id = select(3, GetSpellInfo(action.name))
       action[2], action[4] = id, icon or action.icon
     end
   end
-  return e(...)
+  return next(...)
 end
 
 do
   local function RemoveOverride(self, button, binding)
-    scope.DeleteAction(binding)
-    --button:UpdateButton()
     CloseDropDownMenus()
+    if scope.DeleteAction(binding) then
+      button:Update()
+    end
   end
   local function RemoveBinding(self, button, binding)
+    CloseDropDownMenus()
     SetBinding(binding, nil)
     SaveBindings(GetCurrentBindingSet())
-    button:UpdateButton()
-    CloseDropDownMenus()
+    button:Update()
   end
   local function PromoteBinding(self, button, binding)
-    scope.PromoteToAction(binding)
-    SetBinding(binding, nil)
-    SaveBindings(GetCurrentBindingSet())
-    --button:UpdateButton()
     CloseDropDownMenus()
+    if scope.PromoteToAction(binding) then
+      SetBinding(binding, nil)
+      SaveBindings(GetCurrentBindingSet())
+      button:Update()
+    end
   end
   local function LockBinding(self, button, binding)
-    scope.ToggleActionLock(binding)
-    --button:UpdateButton()
     CloseDropDownMenus()
+    if scope.UpdateActionLock(binding) then
+      button:Update()
+    end
   end
   local function CreateBlob(self, button, binding)
     scope.SaveAction(binding, "BLOB", binding, "", 3615513)
-    --button:UpdateButton()
+    --button:Update()
     CloseDropDownMenus()
   end
   local function EditBlob(self, button, binding)
@@ -434,7 +423,7 @@ do
 
   local function InitializeDropdown(self, _, section)
     local button = info.arg1
-    local binding = scope.modifier..button.key
+    local binding = scope.MODIFIER..button.key
     info.arg2 = binding
     if section == "root" then
       local action = scope.GetAction(binding)
@@ -448,17 +437,17 @@ do
       reset()
       if not action.kind then
         info.text = 'none'
-      elseif action.BLOB then
+      elseif action.blob then
         info.text = action.id
       else
         info.text = action.kind.." "..action.name
       end
-      info.hasArrow = action.kind and not action.locked
+      info.hasArrow = action.kind and not action.lock
       info.menuList = "override"
-      info.disabled = not action.kind or action.locked
+      info.disabled = not action.kind or action.lock
       UIDropDownMenu_AddButton(info, 1)
 
-      if action.BLOB then
+      if action.blob then
         reset()
         info.text = "Edit blob"
         info.func = EditBlob
@@ -478,15 +467,15 @@ do
 
       reset()
       info.text = command == "" and "none" or command
-      info.hasArrow = not action.locked and command ~= ""
+      info.hasArrow = not action.lock and command ~= ""
       info.menuList = "binding"
       info.disabled = not info.hasArrow
       UIDropDownMenu_AddButton(info, 1)
 
       reset()
-      info.text = action.locked and "Unlock" or "Lock"
+      info.text = action.lock and "Unlock" or "Lock"
       info.notCheckable = false
-      info.checked = action.locked
+      info.checked = action.lock
       info.func = LockBinding
       UIDropDownMenu_AddSeparator(1)
       UIDropDownMenu_AddButton(info, 1)
@@ -506,13 +495,13 @@ do
       local kind, name = string.match(command, "^(%w+) (.*)$")
       if kind == 'SPELL' or kind == 'MACRO' or kind == 'ITEM' then
         reset()
-        info.text = "Promote to override"
+        info.text = "Promote to "..kind.." override"
         info.func = PromoteBinding
         UIDropDownMenu_AddButton(info, 2)
       end
       if kind == 'MACRO' then
         reset()
-        info.text = "Import to blob"
+        info.text = "Promote to BLOB override"
         info.func = scope.ImportMacroToAction
         UIDropDownMenu_AddButton(info, 2)
       end
@@ -523,7 +512,7 @@ do
     end
   end
 
-  function scope.UpdateDropdown(e, button, ...)
+  function scope.UpdateDropdown(next, event, button, ...)
     if not drop then
       info = UIDropDownMenu_CreateInfo()
       drop = CreateFrame("frame", nil, UIParent, "UIDropDownMenuTemplate")
@@ -532,7 +521,6 @@ do
     end
     info.arg1 = button
     ToggleDropDownMenu(1, nil, drop, "cursor", 0, 0, "root")
-    return e(button, ...)
+    return next(event, button, ...)
   end
 end
-]]

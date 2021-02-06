@@ -275,34 +275,28 @@ do
   local mmax = math.max
   local next, push, clean = scope.next, scope.push, scope.clean
   function scope.LAYOUT.__call(self, ...)
-    print("?", self.n)
     return next(self, clean, unpack(self, 1, self.n))
   end
   function scope.LAYOUT.col(self, x, ...) 
-    print("col", self)
     self.x = mmax(0, x * self.size)
     return next(self, ...)
   end
   function scope.LAYOUT.row(self, y, ...)
-    print("row", self)
     self.y = mmax(0, y * self.size)
     return next(self, ...)
   end
   function scope.LAYOUT.move(self, x, y, ...)
-    print("move")
     self.x = mmax(0, self.x+x*self.size)
     self.y = mmax(0, self.y+y*self.size)
     return next(self, ...)
   end
   function scope.LAYOUT.key(self, char, ...)
-    print("key")
     return next(push(self, strupper(char), self.x, self.y), ...)
   end
   local strgmatch = string.gmatch
   local poolAcquire = scope.poolAcquire
   local poolRelease = scope.poolRelease
   function scope.LAYOUT.keys(self, x, y, chars, ...)
-    print("keys")
     local args = poolAcquire(nil)
     for char in strgmatch(chars, "[^ ]+") do
       push(args, self.key, char, self.move, x or 1, y or 0)
@@ -365,8 +359,8 @@ do
 
   local CLASS, SPECC = nil, nil
   function scope.UpdatePlayerVariables(next, ...)
-    write(scope, "CLASS", select(2, UnitClass("player")))
-    write(scope, "SPECC", GetSpecialization())
+    scope.CLASS = select(2, UnitClass("player"))
+    scope.SPECC = GetSpecialization()
     CLASS, SPECC = scope.CLASS, scope.SPECC
     return next(...)
   end
@@ -385,11 +379,22 @@ do
     return setmetatable(dbReadAction(binding) or NIL, ACTION)
   end
 
+  do
+    local function iter(...)
+      local k, v = next(...)
+      return k, setmetatable(v or NIL, ACTION)
+    end
+    function scope.GetActions()
+      return iter, dbReadAction() or NIL
+    end
+  end
+
   local dispatch = scope.dispatch
   local bindingModifiers = scope.bindingModifiers
   function scope.DeleteAction(binding)
     if dbWriteAction(binding, nil) then
-      dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+      dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
+      return true
     end
   end
 
@@ -397,37 +402,53 @@ do
     local function deleteAction(binding, kind)
       local action = scope.GetAction(binding)
       if action ~= NIL and action.kind ~= kind then
-        scope.DeleteAction(binding)
+        return scope.DeleteAction(binding)
       end
     end
 
     function scope.UpdateActionSpell(binding, id, name, icon)
       deleteAction(binding, ACTION.spell)
-      if dbWriteAction(binding, ACTION.kind, ACTION.spell)
-        or dbWriteAction(binding, ACTION.id,   id)
-        or dbWriteAction(binding, ACTION.name, name)
-        or dbWriteAction(binding, ACTION.icon, icon or 134400) then
-        dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+      if scope.match(true,
+        dbWriteAction(binding, ACTION.kind, ACTION.spell),
+        dbWriteAction(binding, ACTION.id,   id),
+        dbWriteAction(binding, ACTION.name, name),
+        dbWriteAction(binding, ACTION.icon, icon or 134400)) then
+        dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
+        return true
       end
     end
 
     function scope.UpdateActionItem(binding, id, name, icon)
       deleteAction(binding, ACTION.item)
-      if dbWriteAction(binding, ACTION.kind, ACTION.item)
-        or dbWriteAction(binding, ACTION.id,   id)
-        or dbWriteAction(binding, ACTION.name, name)
-        or dbWriteAction(binding, ACTION.icon, icon or 134400) then
-        dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+      if scope.match(true,
+        dbWriteAction(binding, ACTION.kind, ACTION.item),
+        dbWriteAction(binding, ACTION.id,   id),
+        dbWriteAction(binding, ACTION.name, name),
+        dbWriteAction(binding, ACTION.icon, icon or 134400)) then
+        dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
+        return true
       end
     end
 
     function scope.UpdateActionMacro(binding, id, name, icon)
       deleteAction(binding, ACTION.macro)
-      if dbWriteAction(binding, ACTION.kind, ACTION.macro)
-        or dbWriteAction(binding, ACTION.id,   id)
-        or dbWriteAction(binding, ACTION.name, name)
-        or dbWriteAction(binding, ACTION.icon, icon or 134400) then
-        dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+      if scope.match(true,
+        dbWriteAction(binding, ACTION.kind, ACTION.macro),
+        dbWriteAction(binding, ACTION.id,   id),
+        dbWriteAction(binding, ACTION.name, name),
+        dbWriteAction(binding, ACTION.icon, icon or 134400)) then
+        dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
+        return true
+      end
+    end
+
+    function scope.UpdateAction(binding, kind, ...)
+      if kind == ACTION.spell then
+        return scope.UpdateActionSpell(binding, ...)
+      elseif kind == ACTION.item then
+        return scope.UpdateActionItem(binding, ...)
+      elseif kind == ACTION.macro then
+        return scope.UpdateActionMacro(binding, ...)
       end
     end
   end
@@ -435,7 +456,134 @@ do
   function scope.UpdateActionLock(binding)
     local value = not dbReadAction(binding, ACTION.lock) and true or nil
     if dbWriteAction(binding, ACTION.lock, value) then
-      dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+      dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
+      return true
+    end
+  end
+
+  function scope.ActionIcon(action)
+    if action.spell then
+      return select(3, GetSpellInfo(action.id)) or action.icon 
+    elseif action.macro then
+      return select(2, GetMacroInfo(action.name)) or action.icon
+    elseif action.item then
+      return select(10, GetItemInfo(action.id or 0)) or action.icon
+    elseif action.blob then
+      return action.icon or 441148
+    end
+    return action.icon or nil
+  end
+
+  do
+    local function cleanup(e, ...)
+      scope.__pickup = nil
+      scope.dequeue("CURSOR_UPDATE", cleanup)
+      return e(...)
+    end
+    function scope.PickupAction(binding)
+      if scope.PORTAL_BUTTONS[binding] then
+        PickupAction(scope.PORTAL_BUTTONS[binding] + scope.STANCE_OFFSET - 1)
+        return true
+      end
+      local action = scope.GetAction(binding)
+      if action.lock then
+        return false
+      elseif action.spell then
+        PickupSpell(action.id)
+        if not GetCursorInfo() then
+          local macro = CreateMacro("__OBRO_TMP", scope.ActionIcon(action))
+          PickupMacro(macro)
+          DeleteMacro(macro)
+          scope.__pickup = action
+          scope.enqueue("CURSOR_UPDATE", cleanup)
+        end
+      elseif action.macro then
+        PickupMacro(action.name)
+      elseif action.item then
+        PickupItem(action.id)
+      elseif action.blob then
+        local macro = CreateMacro("__OBRO_TMP", scope.ACtionIcon(action))
+        PickupMacro(macro)
+        DeleteMacro(macro)
+        scope.enqueue("CURSOR_UPDATE", cleanup)
+        scope.__pickup = action
+      elseif action.kind then
+        assert(false, "Unhandled pickup: "..action.kind)
+      end
+      return scope.DeleteAction(binding)
+    end
+  end
+
+  function scope.ReceiveAction(binding)
+    if scope.PORTAL_BUTTONS[binding] then
+      PlaceAction(scope.PORTAL_BUTTONS[binding] + scope.STANCE_OFFSET - 1)
+      return true
+    elseif scope.GetAction(binding).locked then
+      return false
+    end
+    local kind, id, link, arg1, arg2 = GetCursorInfo()
+    if kind == "spell" then
+      ClearCursor()
+      local id = arg2 or arg1
+      local name, _, icon = GetSpellInfo(id)
+      assert(id ~= nil)
+      assert(name ~= nil)
+      assert(icon ~= nil)
+      return scope.match(true,
+        scope.PickupAction(binding),
+        scope.UpdateActionSpell(binding, id, name, icon))
+
+    elseif kind == "item" then
+      ClearCursor()
+      local name = select(3, string.match(link, "^|c%x+|H(%a+):(%d+).+|h%[([^%]]+)"))
+      local icon = select(10, GetItemInfo(id))
+      assert(link ~= nil)
+      assert(name ~= nil)
+      assert(icon ~= nil)
+      return scope.match(true,
+        scope.PickupAction(binding),
+        scope.UpdateActionItem(binding, id, name, icon))
+
+    elseif kind == "macro" and id == 0 then
+      local action = scope.__pickup
+      ClearCursor()
+      assert(scope.__pickup == nil)
+      return scope.match(true,
+        scope.PickupAction(binding),
+        scope.UpdateAction(binding, unpack(action, 1, 4)))
+
+    elseif kind == "macro" then
+      ClearCursor()
+      local name, icon = GetMacroInfo(id)
+      assert(type(id) == "number")
+      assert(id ~= nil)
+      assert(name ~= nil)
+      assert(icon ~= nil)
+      return scope.match(true,
+        scope.PickupAction(binding),
+        scope.UpdateActionMacro(binding, id, name, icon))
+
+    elseif kind then
+      assert(false, "Unhandled receive: "..kind)
+    end
+  end
+
+  function scope.PromoteToAction(binding)
+    local kind, name = string.match(GetBindingAction(binding, false), "^(%w+) (.*)$")
+    if kind == 'SPELL' then
+      local icon, _, _, _, id = select(3, GetSpellInfo(name))
+      assert(name ~= nil)
+      return scope.UpdateActionSpell(binding, id, name, icon or 134400)
+    elseif kind == 'MACRO' then
+      local id = GetMacroIndexByName(name)
+      local icon = select(2, GetMacroInfo(name))
+      assert(name ~= nil)
+      return scope.UpdateActionMacro(binding, id, name, icon or 134400)
+    elseif kind == 'ITEM' then
+      local link, _, _, _, _, _, _, _, icon = select(2, GetItemInfo(name))
+      local id = link and select(4, string.find(link, "^|c%x+|H(%a+):(%d+)[|:]"))
+      assert(name ~= nil)
+      return scope.UpdateActionItem(binding, id, name, icon or 134400)
     end
   end
 end
