@@ -1,39 +1,16 @@
 <Ui xmlns='http://www.blizzard.com/wow/ui/'>
   <Script file="deps\utils.misc.lua" />
+  <!--
   <Script file="deps\utils.action.lua" />
+  -->
   <Script file="deps\layouts.lua" />
   <Script file="sections\root.lua" />
   <Script file="sections\keyboard.lua" />
-  <Script file="sections\editor.lua" />
-
   <!--
-  <Script file="sections\selector.lua" />
-  <Button name="OBroBindsLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTextTemplate" virtual="true">
-    <Size>
-      <AbsDimension y="28" />
-    </Size>
-    <Scripts>
-      <OnDragStart method="OnDragStart" />
-    </Scripts>
-    <Layers>
-      <Layer level="BACKGROUND">
-        <FontString parentKey="Upper" inherits="GameFontNormalSmall" justifyH="LEFT" maxLines="1">
-          <Anchors>
-            <Anchor point="LEFT" x="36" />
-            <Anchor point="RIGHT" x="-32" />
-          </Anchors>
-        </FontString>
-        <Texture parentKey="Icon" />
-      </Layer>
-    </Layers>
-  </Button>
-  <Frame name="OBroBindsListTemplate" mixin="OBroBindsListMixin" inherits="ScrollListTemplate" virtual="true">
-    <Scripts>
-      <OnLoad method="OnLoad" />
-    </Scripts>
-  </Frame>
+  <Script file="sections\editor.lua" />
   -->
 
+  <!--
   <Button name="OBroBindsLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTemplate" virtual="true">
     <Size>
       <AbsDimension y="40" />
@@ -81,6 +58,7 @@
       </OnLoad>
     </Scripts>
   </ScrollFrame>
+  -->
 
   <Script file="OBroBinds.lua" />
 </Ui>

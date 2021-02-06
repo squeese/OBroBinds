@@ -79,8 +79,8 @@ do
   end
   function compare(a, b)
     if not walk(a, b) then
-      print(inspect(a))
-      print(inspect(b))
+      --print(inspect(a))
+      --print(inspect(b))
       return false
     end
     return true
@@ -744,4 +744,60 @@ run("#12 STACK.fold with nil", function(assert)
 
   assert(scope[BEG] == nil)
   assert(scope[END] == nil)
+end)
+
+run("#13 savedvariables", function(assert)
+  scope.class = "MAGE"
+  scope.spec = 1
+  OBroBindsDB = {}
+
+  --local action
+  --action = scope.GetAction("F5")
+  --assert(action == scope.NIL)
+
+  --scope.WriteAction("F5", scope.ACTION.kind, "SPELL", scope.ACTION.id, 1234, scope.ACTION.name, "name", scope.ACTION.icon, 123)
+  --action = scope.GetAction("F5")
+
+  --print(inspect(action))
+  --print(action.SPELL, action.kind, action.id)
+
+  local function test(expected, ti, ...)
+    local tr, diff = scope.write(ti, ...)
+    if diff ~= expected then
+      print(...)
+      print("input", inspect(ti))
+      print("outpt", inspect(tr))
+      assert(false)
+    end
+    return tr, diff
+  end
+
+
+  local t = nil
+  t, diff = scope.write(t, scope.class, scope.spec, "F5", scope.ACTION.kind, "SPELL")
+  t, diff = scope.write(t, scope.class, scope.spec, "F5", scope.ACTION.id, 123)
+  --t, diff = scope.write(t, scope.class, scope.spec, "F5", scope.ACTION.id, nil)
+
+  t, diff = test(false, t, scope.class, scope.spec, "F5", scope.ACTION.kind, "SPELL")
+  t, diff = test(false, t, scope.class, scope.spec, "F5", scope.ACTION.id,   123)
+  t, diff = test(true,  t, scope.class, scope.spec, "F5", scope.ACTION.name, "name")
+  t, diff = test(true,  t, scope.class, scope.spec, "F5", scope.ACTION.icon, "icon")
+  t, diff = test(true,  t, scope.class, scope.spec, "F5", scope.ACTION.lock, true)
+  t, diff = test(true,  t, scope.class, nil)
+  t, diff = test(false, t, scope.class, nil)
+  t, diff = test(true,  t, scope.class, scope.spec, "F5", scope.ACTION.lock, true)
+  t, diff = test(true,  t, scope.class, scope.spec, "F5", scope.ACTION.kind, "SPELL")
+  t, diff = test(false, t, scope.class, scope.spec, "F5", scope.ACTION.lock, true)
+  t, diff = test(false, t, scope.class, scope.spec, "F5", scope.ACTION.kind, "SPELL")
+
+  --local a = scope.read(t, scope.class, scope.spec, "F5")
+  --a, diff = test(true, a, scope.ACTION.icon, 123)
+  --print(inspect(t, scope.class, scope.spec, "F5"))
+
+  for i = 1, 1 do
+    local diff = scope.UpdateActionSpell("F6", 123, "somename", nil)
+    print(1, diff)
+  end
+  local action = scope.GetAction("F6")
+  print(diff, inspect(action))
 end)

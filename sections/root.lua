@@ -1,20 +1,6 @@
 local scope = select(2, ...)
 
-function scope.CreateRootFrame()
-  scope.root = CreateFrame("frame", "OBroBindsRoot", UIParent, nil)
-  scope.root:SetMovable(true)
-  scope.root:Hide()
-  scope.root:SetScript("OnEvent", scope.dispatch)
-  function _G.OBroBinds_Toggle()
-    local visible = scope.root:IsVisible()
-    scope.dbWrite("GUI", "open", not visible and true or nil)
-    scope:dispatch(visible and 'ADDON_ROOT_HIDE' or 'ADDON_ROOT_SHOW')
-  end
-  scope.root:SetSize(400, 200)
-  scope.root:SetPoint("CENTER", 0, 0)
-  scope.CreateRootFrame = nil
-end
-
+--[[
 local function bg(frame, ...)
   frame.bg = frame:CreateTexture(nil, "BACKGROUND")
   frame.bg:SetAllPoints()
@@ -60,3 +46,4 @@ function scope.UpdatePlayerBindings(next, ...)
   end
   return next(...)
 end
+]]

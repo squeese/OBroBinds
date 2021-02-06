@@ -1,114 +1,7 @@
 local scope = select(2, ...)
-scope.ACTION = { kind = 1, id = 2, name = 3, text = 3, icon = 4, locked = 5, script = 6, SPELL = 7, MACRO = 7, ITEM = 7, BLOB = 7 }
-
-function scope.ACTION:__index(key)
-  if self == scope.empty then return end
-  local val = scope.ACTION[key]
-  if type(val) ~= 'number' then
-    return val
-  elseif val == 7 then
-    return rawget(self, 1) == key
-  else
-    return rawget(self, val)
-  end
-  return value
-end
-
-scope.secureButtons = { index = 0 }
-
-function scope.secureButtons:next(binding)
-  local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
-  if index then
-    local button = self[tonumber(index)]
-    if button.stack then
-      local event = scope.poolAcquire(scope.EVENT, button.stack)
-      scope.poolRelease(event, event())
-      scope.poolRelease(button.stack)
-      button.stack = nil
-    end
-    return button
-  end
-  self.index = self.index + 1
-  if self.index > #self then
-    local button = CreateFrame("Button", "OBroBindsSecureBlobButton"..self.index, nil, "SecureActionButtonTemplate")
-    button:RegisterForClicks("AnyUp")
-    button:SetAttribute("type", "macro")
-    button.command = "CLICK "..button:GetName()..":LeftButton"
-    table.insert(self, button)
-  end
-  return self[self.index]
-end
-
-function scope.secureButtons:release(binding)
-  local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
-  if index then
-    if button.stack then
-      local event = scope.poolAcquire(scope.EVENT, button.stack)
-      scope.poolRelease(event, event())
-      scope.poolRelease(button.stack)
-      button.stack = nil
-    end
-    table.insert(self, table.remove(self, tonumber(index)))
-    self.index = self.index - 1
-  end
-end
 
 
-function scope.ACTION:SetOverrideBinding(binding)
-  if self.SPELL then
-    SetOverrideBindingSpell(scope.root, false, binding, GetSpellInfo(self.id) or self.name)
-  elseif self.MACRO then
-    SetOverrideBindingMacro(scope.root, false, binding, self.name)
-  elseif self.ITEM then
-    SetOverrideBindingItem(scope.root, false, binding, self.name)
 
-  elseif self.BLOB and self.script then
-    local button = scope.secureButtons:next(binding)
-
-    if not button.update then
-      button.update = function(text)
-        if InCombatLockdown() then
-          return
-        end
-        button:SetAttribute("macrotext", text)
-      end
-    end
-    -- TODO: pcall
-    local init, err = loadstring([[
-      local STACK, update = ...
-    ]]..self.text)
-
-    if err then
-      print("Error making script ("..binding.."): ", err)
-    else
-      button.stack = scope.poolAcquire(scope.STACK, init(scope.STACK, button.update))
-      local event = scope.poolAcquire(scope.EVENT, button.stack)
-      scope.poolRelease(event, event())
-      SetOverrideBinding(scope.root, false, binding, button.command)
-    end
-
-  elseif self.BLOB then
-    local button = scope.secureButtons:next(binding)
-    button:SetAttribute("macrotext", self.text)
-    SetOverrideBinding(scope.root, false, binding, button.command)
-
-  else
-    SetOverrideBinding(scope.root, false, binding, nil)
-  end
-end
-
-function scope.ACTION:Icon()
-  if self.SPELL then
-    return select(3, GetSpellInfo(self.id)) or self.icon 
-  elseif self.MACRO then
-    return select(2, GetMacroInfo(self.name)) or self.icon
-  elseif self.ITEM then
-    return select(10, GetItemInfo(self.id or 0)) or self.icon
-  elseif self.BLOB then
-    return self.icon or 441148
-  end
-  return self.icon or nil
-end
 
 do
   local function iter(...)
@@ -273,5 +166,88 @@ function scope.ReceiveAction(binding)
     elseif kind then
       assert(false, "Unhandled receive: "..kind)
     end
+  end
+end
+
+
+scope.secureButtons = { index = 0 }
+
+function scope.secureButtons:next(binding)
+  local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
+  if index then
+    local button = self[tonumber(index)]
+    if button.stack then
+      local event = scope.poolAcquire(scope.EVENT, button.stack)
+      scope.poolRelease(event, event())
+      scope.poolRelease(button.stack)
+      button.stack = nil
+    end
+    return button
+  end
+  self.index = self.index + 1
+  if self.index > #self then
+    local button = CreateFrame("Button", "OBroBindsSecureBlobButton"..self.index, nil, "SecureActionButtonTemplate")
+    button:RegisterForClicks("AnyUp")
+    button:SetAttribute("type", "macro")
+    button.command = "CLICK "..button:GetName()..":LeftButton"
+    table.insert(self, button)
+  end
+  return self[self.index]
+end
+
+function scope.secureButtons:release(binding)
+  local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
+  if index then
+    if button.stack then
+      local event = scope.poolAcquire(scope.EVENT, button.stack)
+      scope.poolRelease(event, event())
+      scope.poolRelease(button.stack)
+      button.stack = nil
+    end
+    table.insert(self, table.remove(self, tonumber(index)))
+    self.index = self.index - 1
+  end
+end
+
+function scope.ACTION:SetOverrideBinding(binding)
+  if self.SPELL then
+    SetOverrideBindingSpell(scope.root, false, binding, GetSpellInfo(self.id) or self.name)
+  elseif self.MACRO then
+    SetOverrideBindingMacro(scope.root, false, binding, self.name)
+  elseif self.ITEM then
+    SetOverrideBindingItem(scope.root, false, binding, self.name)
+
+  elseif self.BLOB and self.script then
+    local button = scope.secureButtons:next(binding)
+
+    if not button.update then
+      button.update = function(text)
+        if InCombatLockdown() then
+          return
+        end
+        button:SetAttribute("macrotext", text)
+      end
+    end
+    -- TODO: pcall
+    local init, err = loadstring([[
+      local STACK, update = ...
+    ]]..self.text)
+
+    if err then
+      print("Error making script ("..binding.."): ", err)
+    else
+      button.stack = scope.poolAcquire(scope.STACK, init(scope.STACK, button.update))
+      local event = scope.poolAcquire(scope.EVENT, button.stack)
+      scope.poolRelease(event, event())
+      SetOverrideBinding(scope.root, false, binding, button.command)
+    end
+
+  elseif self.BLOB then
+    local button = scope.secureButtons:next(binding)
+    button:SetAttribute("macrotext", self.text)
+    SetOverrideBinding(scope.root, false, binding, button.command)
+
+  else
+    SetOverrideBinding(scope.root, false, binding, nil)
   end
 end

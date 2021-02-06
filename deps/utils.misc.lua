@@ -1,7 +1,7 @@
 local scope = select(2, ...)
 local tinsert = table.insert
 local tremove = table.remove
-local tunpack = table.unpack
+local tunpack = unpack or table.unpack
 scope.NIL = {}
 
 function scope.next(self, fn, ...)
@@ -106,16 +106,17 @@ do
     if type(key) == 'function' then
       local old = src or poolAcquire(nil)
       local new = next(old, key, ...)
+      local diff = src ~= new
       if old ~= new and type(old) == 'table' then
         cleanup(old)
       end
       if type(new) == 'table' then
         for _ in pairs(new) do
-          return new
+          return new, diff
         end
-        return cleanup(new)
+        return cleanup(new), diff
       end
-      return new
+      return new, diff
     elseif select("#", ...) == 0 then
       if src and type(src) == 'table' then
         cleanup(src)
@@ -123,19 +124,21 @@ do
       return key
     end
     local old = type(src) == 'table' and src[key] or nil
-    local new = write(type(old) == "table" and old or nil, ...)
+    local new, diff = write(type(old) == "table" and old or nil, ...)
+    diff = diff or old ~= new
     if not src then
       if new then
         src = poolAcquire(nil)
+        diff = true
         src[key] = new
       end
-      return src
+      return src, diff
     end
     src[key] = new
     for _ in pairs(src) do
-      return src
+      return src, diff
     end
-    return poolRelease(src, nil)
+    return poolRelease(src, nil), diff
   end
   scope.write = write
 end
@@ -157,7 +160,7 @@ do
     if fn and not match(fn, tunpack(read(scope, key) or NIL)) then
       write(scope, key, push, fn)
       if #read(scope, key) == 1 and strsub(key, 1, 5) ~= "ADDON" then
-        scope.root:RegisterEvent(key)
+        scope.ROOT:RegisterEvent(key)
       end
     end
     return fn
@@ -177,7 +180,7 @@ do
         end
       end
       if not read(scope, key) and strsub(key, 1, 5) ~= "ADDON" then
-        scope.root:UnregisterEvent(key)
+        scope.ROOT:UnregisterEvent(key)
       end
     end
   end
@@ -246,14 +249,66 @@ do
     end
     return fold(next(self, ...))
   end
-  --local mt = {}
-  --function mt:__call(e, ...)
-    --scope.next(SafeUnpack(self))
-    --return e(...)
-  --end
-  --function scope.STACK.apply(...)
-    --return setmetatable(SafePack(...), mt)
-  --end
+  do
+    local mt = {}
+    function mt:__call(next, ...)
+      scope.next(SafeUnpack(self))
+      return next(...)
+    end
+    function scope.STACK.apply(...)
+      return setmetatable(SafePack(...), mt)
+    end
+  end
+end
+
+do
+  local strmatch, pattern = string.match, "^(.--?)([^-]*.)$"
+  function scope.bindingModifiers(binding)
+    return strmatch(binding, pattern)
+  end
+end
+
+------------------------------------------------------------------ LAYOUT
+scope.LAYOUT = { x = 0, y = 0, size = 40, n = 0 }
+scope.LAYOUT.__index = scope.LAYOUT
+do
+  local mmax = math.max
+  local next, push, clean = scope.next, scope.push, scope.clean
+  function scope.LAYOUT.__call(self, ...)
+    print("?", self.n)
+    return next(self, clean, unpack(self, 1, self.n))
+  end
+  function scope.LAYOUT.col(self, x, ...) 
+    print("col", self)
+    self.x = mmax(0, x * self.size)
+    return next(self, ...)
+  end
+  function scope.LAYOUT.row(self, y, ...)
+    print("row", self)
+    self.y = mmax(0, y * self.size)
+    return next(self, ...)
+  end
+  function scope.LAYOUT.move(self, x, y, ...)
+    print("move")
+    self.x = mmax(0, self.x+x*self.size)
+    self.y = mmax(0, self.y+y*self.size)
+    return next(self, ...)
+  end
+  function scope.LAYOUT.key(self, char, ...)
+    print("key")
+    return next(push(self, strupper(char), self.x, self.y), ...)
+  end
+  local strgmatch = string.gmatch
+  local poolAcquire = scope.poolAcquire
+  local poolRelease = scope.poolRelease
+  function scope.LAYOUT.keys(self, x, y, chars, ...)
+    print("keys")
+    local args = poolAcquire(nil)
+    for char in strgmatch(chars, "[^ ]+") do
+      push(args, self.key, char, self.move, x or 1, y or 0)
+    end
+    return next(self, poolRelease(push(args, ...), unpack(args)))
+  end
 end
 
 ------------------------------------------------------------------ ACTION
@@ -264,21 +319,123 @@ scope.ACTION.name  = 3
 scope.ACTION.body  = 3
 scope.ACTION.icon  = 4
 scope.ACTION.lock  = 5
-scope.ACTION.SPELL = 7
-scope.ACTION.MACRO = 7
-scope.ACTION.ITEM  = 7
-scope.ACTION.BLOB  = 7
+scope.ACTION.spell = "SPELL"
+scope.ACTION.macro = "MACRO"
+scope.ACTION.item  = "ITEM"
+scope.ACTION.blob  = "BLOB"
+scope.ACTION.SPELL = 1
+scope.ACTION.MACRO = 1
+scope.ACTION.ITEM  = 1
+scope.ACTION.BLOB  = 1
+
 do
   local NIL, ACTION = scope.NIL, scope.ACTION
   function ACTION:__index(key)
     if self == NIL then return end
     local index = ACTION[key]
     if type(index) ~= 'number' then
-      return index
-    elseif index == 7 then
-      return rawget(self, 1) == key
+      return rawget(self, ACTION[index]) == index
     else
       return rawget(self, index)
+    end
+  end
+
+  --setmetatable(ACTION, ACTION)
+  --local action = setmetatable({ "SPELL" }, ACTION)
+  --print("ACTION.spell", ACTION.spell)
+  --print("ACTION.kind", ACTION.kind)
+  --print("action.spell", action.spell)
+  --print("action.kind", action.kind)
+  --local t = setmetatable(NIL, ACTION)
+  --print(t.spell)
+
+  local read = scope.read
+  local function dbRead(...)
+    return read(OBroBindsDB, ...)
+  end
+  scope.dbRead = dbRead
+
+  local write = scope.write
+  local function dbWrite(...)
+    local changed
+    OBroBindsDB, changed = write(OBroBindsDB, ...)
+    return changed
+  end
+  scope.dbWrite = dbWrite
+
+  local CLASS, SPECC = nil, nil
+  function scope.UpdatePlayerVariables(next, ...)
+    write(scope, "CLASS", select(2, UnitClass("player")))
+    write(scope, "SPECC", GetSpecialization())
+    CLASS, SPECC = scope.CLASS, scope.SPECC
+    return next(...)
+  end
+
+  local function dbReadAction(...)
+    return read(OBroBindsDB, CLASS, SPECC, ...)
+  end
+
+  local function dbWriteAction(...)
+    local changed
+    OBroBindsDB, changed = write(OBroBindsDB, CLASS, SPECC, ...)
+    return changed
+  end
+
+  function scope.GetAction(binding)
+    return setmetatable(dbReadAction(binding) or NIL, ACTION)
+  end
+
+  local dispatch = scope.dispatch
+  local bindingModifiers = scope.bindingModifiers
+  function scope.DeleteAction(binding)
+    if dbWriteAction(binding, nil) then
+      dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+    end
+  end
+
+  do
+    local function deleteAction(binding, kind)
+      local action = scope.GetAction(binding)
+      if action ~= NIL and action.kind ~= kind then
+        scope.DeleteAction(binding)
+      end
+    end
+
+    function scope.UpdateActionSpell(binding, id, name, icon)
+      deleteAction(binding, ACTION.spell)
+      if dbWriteAction(binding, ACTION.kind, ACTION.spell)
+        or dbWriteAction(binding, ACTION.id,   id)
+        or dbWriteAction(binding, ACTION.name, name)
+        or dbWriteAction(binding, ACTION.icon, icon or 134400) then
+        dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+      end
+    end
+
+    function scope.UpdateActionItem(binding, id, name, icon)
+      deleteAction(binding, ACTION.item)
+      if dbWriteAction(binding, ACTION.kind, ACTION.item)
+        or dbWriteAction(binding, ACTION.id,   id)
+        or dbWriteAction(binding, ACTION.name, name)
+        or dbWriteAction(binding, ACTION.icon, icon or 134400) then
+        dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+      end
+    end
+
+    function scope.UpdateActionMacro(binding, id, name, icon)
+      deleteAction(binding, ACTION.macro)
+      if dbWriteAction(binding, ACTION.kind, ACTION.macro)
+        or dbWriteAction(binding, ACTION.id,   id)
+        or dbWriteAction(binding, ACTION.name, name)
+        or dbWriteAction(binding, ACTION.icon, icon or 134400) then
+        dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
+      end
+    end
+  end
+
+  function scope.UpdateActionLock(binding)
+    local value = not dbReadAction(binding, ACTION.lock) and true or nil
+    if dbWriteAction(binding, ACTION.lock, value) then
+      dispatch(scope, "ADDON_ACTION_UPDATED", bindingModifiers(binding))
     end
   end
 end

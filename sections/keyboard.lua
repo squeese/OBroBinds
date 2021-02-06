@@ -1,5 +1,4 @@
 local scope = select(2, ...)
-
 do
   local elapsed, pa, pc, ps, modifier = 0, IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
   local function OnUpdate(self, delta)
@@ -8,41 +7,51 @@ do
     local na, nc, ns = IsAltKeyDown(), IsControlKeyDown(), IsShiftKeyDown()
     if pa ~= na or pc ~= nc or ps ~= ns then
       pa, pc, ps = na, nc, ns
-      scope.modifier = (pa and "ALT-" or "")..(pc and "CTRL-" or "")..(ps and "SHIFT-" or "")
+      scope.MODIFIER = (pa and "ALT-" or "")..(pc and "CTRL-" or "")..(ps and "SHIFT-" or "")
       scope:dispatch("ADDON_MODIFIER_CHANGED")
     end
     elapsed = 0
   end
+  function scope.InitializeKeyboardModifierListener()
+    scope.InitializeKeyboardModifierListener = nil
+    scope.KEYBOARD:SetScript("OnUpdate", OnUpdate)
+    scope.MODIFIER = (IsAltKeyDown() and "ALT-" or "")..(IsControlKeyDown() and "CTRL-" or "")..(IsShiftKeyDown() and "SHIFT-" or "")
+  end
+end
+
+do
   local function OnClick(self)
-    scope.offset = self.offset ~= scope.offset and self.offset or 1
+    scope.OFFSET = self.OFFSET ~= scope.OFFSET and self.OFFSET or 1
     scope:dispatch("ADDON_OFFSET_CHANGED")
   end
   local function CreateStanceButton(offset, icon, ...)
     local button = CreateFrame("button", nil, scope.keyboard, "ActionButtonTemplate")
-    button.offset = offset
+    button.OFFSET = offset
     button:RegisterForClicks("AnyUp")
     button:SetScript("OnClick", OnClick)
     button.icon:SetTexture("Interface/Icons/"..icon)
     return scope.push(button, ...)
   end
-  function scope.InitializePageKeyboard(e, ...)
-    scope.keyboard:SetScript("OnUpdate", OnUpdate)
-    scope.modifier = (IsAltKeyDown() and "ALT-" or "")..(IsControlKeyDown() and "CTRL-" or "")..(IsShiftKeyDown() and "SHIFT-" or "")
-    scope.buttons = {}
-    scope.offset = 1
-    scope.mainbar = nil
-    scope.stances = nil
-    if scope.class == "ROGUE" then
-      scope.write(scope, 'stances', scope.push, CreateStanceButton(73,  'ability_stealth',            1, 2, 3))
-    elseif scope.class == "DRUID" then
-      scope.write(scope, 'stances', scope.push, CreateStanceButton(97,  'ability_racial_bearform',    1, 2, 3, 4))
-      scope.write(scope, 'stances', scope.push, CreateStanceButton(73,  'ability_druid_catform',      1, 2, 3, 4))
-      scope.write(scope, 'stances', scope.push, CreateStanceButton(109, 'spell_nature_forceofnature', 1))
+  function scope.InitializeKeyboardStanceButtons()
+    scope.InitializeKeyboardStanceButtons = nil
+    if scope.CLASS == "ROGUE" then
+      scope.write(scope, 'STANCES', scope.push, CreateStanceButton(73,  'ability_stealth',            1, 2, 3))
+    elseif scope.CLASS == "DRUID" then
+      scope.write(scope, 'STANCES', scope.push, CreateStanceButton(97,  'ability_racial_bearform',    1, 2, 3, 4))
+      scope.write(scope, 'STANCES', scope.push, CreateStanceButton(73,  'ability_druid_catform',      1, 2, 3, 4))
+      scope.write(scope, 'STANCES', scope.push, CreateStanceButton(109, 'spell_nature_forceofnature', 1))
     end
-    return e(scope.DEFAULT_KEYBOARD_LAYOUT, ...)
   end
 end
 
+
+
+
+    --return next(scope.DEFAULT_KEYBOARD_LAYOUT, ...)
+  --end
+--end
+
+--[[
 local CreateActionButton
 do
   local function OnEnter(self)
@@ -91,12 +100,23 @@ do
     button.kind = button:CreateTexture(nil, "OVERLAY")
     button.kind:SetPoint("BOTTOMLEFT", 0, 0)
     button.kind:SetPoint("TOPRIGHT", button, "BOTTOMRIGHT", 0, 14)
-    --button.kind:SetSize(12, 12)
-    --button.kind:SetTexCoord(0.1, 0.9, 0.1, 0.9)
     button.kind:SetColorTexture(0, 0, 0, 0.75)
     return button
   end
 end
+
+--function scope.ACTION:Icon()
+  --if self.SPELL then
+    --return select(3, GetSpellInfo(self.id)) or self.icon 
+  --elseif self.MACRO then
+    --return select(2, GetMacroInfo(self.name)) or self.icon
+  --elseif self.ITEM then
+    --return select(10, GetItemInfo(self.id or 0)) or self.icon
+  --elseif self.BLOB then
+    --return self.icon or 441148
+  --end
+  --return self.icon or nil
+--end
 
 do
   local function UpdateButton(self)
@@ -515,3 +535,4 @@ do
     return e(button, ...)
   end
 end
+]]

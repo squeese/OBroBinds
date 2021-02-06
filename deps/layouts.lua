@@ -1,6 +1,17 @@
 local scope = select(2, ...)
-local mmax, tinsert = math.max, table.insert
+local LAYOUT, poolAcquire = scope.LAYOUT, scope.poolAcquire
 
+scope.DEFAULT_KEYBOARD_LAYOUT = poolAcquire(LAYOUT,
+  LAYOUT.keys, 1, 0, "F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12", LAYOUT.col, 0,    LAYOUT.row, 1,
+  LAYOUT.keys, 1, 0, "1 2 3 4 5 6 7 8 9 0 - =",                LAYOUT.col, 0.3,  LAYOUT.row, 2,
+  LAYOUT.keys, 1, 0, "q w e r t y u i o p [ ]",                LAYOUT.col, 0.6,  LAYOUT.row, 3,
+  LAYOUT.keys, 1, 0, "a s d f g h j k l ; '",                  LAYOUT.col, 0,    LAYOUT.row, 4,
+  LAYOUT.keys, 1, 0, "\\ z x c v b n m , . /",                 LAYOUT.col, 12.5, LAYOUT.row, 0,
+  LAYOUT.keys, 0, 1, "MOUSEWHEELUP BUTTON3 MOUSEWHEELDOWN")()
+
+
+
+--[[
 local function call(fn, ...)
   if fn and type(fn) == 'function' then
     return fn(...)
@@ -20,6 +31,9 @@ end
 local function move(self, x, y, s, X, Y, fn, ...)
   return call(fn, self, mmax(0, x+X*s), mmax(0, y+Y*s), s, ...)
 end
+
+
+
 
 local function key(self, x, y, s, char, fn, ...)
   tinsert(self, strupper(char))
@@ -64,3 +78,5 @@ scope.DEFAULT_KEYBOARD_LAYOUT = layout(40,
   keys, 1, 0, "a s d f g h j k l ; '",                  col, 0,    row, 4,
   keys, 1, 0, "\\ z x c v b n m , . /",                 col, 12.5, row, 0,
   keys, 0, 1, "MOUSEWHEELUP BUTTON3 MOUSEWHEELDOWN")
+
+]]
