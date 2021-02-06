@@ -19,12 +19,12 @@ scope.secureButtons = { index = 0 }
 function scope.secureButtons:next(binding)
   local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
   if index then
-    print("next, reuse", index)
     local button = self[tonumber(index)]
     if button.stack then
-      local event = scope.push(setmetatable(table.remove(scope.pool) or {}, scope.EVENT), button.stack)
-      scope.poolPush(event, event())
-      button.stack = scope.poolPush(button.stack, nil)
+      local event = scope.poolAcquire(scope.EVENT, button.stack)
+      scope.poolRelease(event, event())
+      scope.poolRelease(button.stack)
+      button.stack = nil
     end
     return button
   end
@@ -43,9 +43,10 @@ function scope.secureButtons:release(binding)
   local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
   if index then
     if button.stack then
-      local event = scope.push(setmetatable(table.remove(scope.pool) or {}, scope.EVENT), button.stack)
-      scope.poolPush(event, event())
-      button.stack = scope.poolPush(button.stack, nil)
+      local event = scope.poolAcquire(scope.EVENT, button.stack)
+      scope.poolRelease(event, event())
+      scope.poolRelease(button.stack)
+      button.stack = nil
     end
     table.insert(self, table.remove(self, tonumber(index)))
     self.index = self.index - 1
@@ -63,6 +64,7 @@ function scope.ACTION:SetOverrideBinding(binding)
 
   elseif self.BLOB and self.script then
     local button = scope.secureButtons:next(binding)
+
     if not button.update then
       button.update = function(text)
         if InCombatLockdown() then
@@ -75,13 +77,13 @@ function scope.ACTION:SetOverrideBinding(binding)
     local init, err = loadstring([[
       local STACK, update = ...
     ]]..self.text)
+
     if err then
       print("Error making script ("..binding.."): ", err)
     else
-      button.stack = scope.push(setmetatable(table.remove(scope.pool) or {}, scope.STACK), init(scope.STACK, button.update))
-      local event = scope.push(setmetatable(table.remove(scope.pool) or {}, scope.EVENT), button.stack)
-      -- TODO: pcall
-      scope.poolPush(event, event())
+      button.stack = scope.poolAcquire(scope.STACK, init(scope.STACK, button.update))
+      local event = scope.poolAcquire(scope.EVENT, button.stack)
+      scope.poolRelease(event, event())
       SetOverrideBinding(scope.root, false, binding, button.command)
     end
 

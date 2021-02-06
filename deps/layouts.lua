@@ -1,23 +1,31 @@
 local scope = select(2, ...)
 local mmax, tinsert = math.max, table.insert
 
+local function call(fn, ...)
+  if fn and type(fn) == 'function' then
+    return fn(...)
+  end
+  return fn, ...
+end
+
+
 local function col(self, _, y, s, x, fn, ...)
-  return scope.call(fn, self, mmax(0, x * s), y, s, ...)
+  return call(fn, self, mmax(0, x * s), y, s, ...)
 end
 
 local function row(self, x, _, s, y, fn, ...)
-  return scope.call(fn, self, x, mmax(0, y * s), s, ...)
+  return call(fn, self, x, mmax(0, y * s), s, ...)
 end
 
 local function move(self, x, y, s, X, Y, fn, ...)
-  return scope.call(fn, self, mmax(0, x+X*s), mmax(0, y+Y*s), s, ...)
+  return call(fn, self, mmax(0, x+X*s), mmax(0, y+Y*s), s, ...)
 end
 
 local function key(self, x, y, s, char, fn, ...)
   tinsert(self, strupper(char))
   tinsert(self, x)
   tinsert(self, y)
-  return scope.call(fn, self, x, y, s, ...)
+  return call(fn, self, x, y, s, ...)
 end
 
 local keys
@@ -27,7 +35,7 @@ do
     for i = 1, #tmp do
       tmp[i] = nil
     end
-    return scope.call(fn, self, x, y, s, ...)
+    return call(fn, self, x, y, s, ...)
   end
   function keys(self, x, y, s, X, Y, keystring, ...)
     for char in string.gmatch(keystring, "[^ ]+") do
@@ -41,12 +49,12 @@ do
       local val = select(i, ...)
       tinsert(tmp, val)
     end
-    return scope.call(clean, self, x, y, s, unpack(tmp))
+    return call(clean, self, x, y, s, unpack(tmp))
   end
 end
 
 local function layout(size, fn, ...)
-  return select(2, scope.call(fn, {}, 0, 0, 40, ...))
+  return select(2, call(fn, {}, 0, 0, 40, ...))
 end
 
 scope.DEFAULT_KEYBOARD_LAYOUT = layout(40,

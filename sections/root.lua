@@ -44,23 +44,19 @@ function scope.CreatePanelFrame(event, ...)
   scope.editor:Hide()
   scope.editor:SetAllPoints()
 
-  --scope.selector = CreateFrame("frame", nil, scope.panel, nil)
-  --scope.selector:Hide()
-  --scope.selector:SetPoint("TOPLEFT", scope.panel, "TOPRIGHT", 0, -4)
-  --scope.selector:SetPoint("BOTTOMLEFT", scope.panel, "BOTTOMRIGHT", 0, 4)
-  --scope.selector:SetWidth(200)
-
   scope.CreatePanelFrame = nil
   return event(...)
 end
 
 function scope.UpdatePlayerBindings(next, ...)
-  ClearOverrideBindings(scope.root)
-  scope.secureButtons.index = 0
-  scope.class = select(2, UnitClass("player"))
-  scope.spec = GetSpecialization()
-  for binding, action in scope.GetActions() do
-    action:SetOverrideBinding(binding)
+  if not InCombatLockdown() then
+    ClearOverrideBindings(scope.root)
+    scope.secureButtons.index = 0
+    scope.class = select(2, UnitClass("player"))
+    scope.spec = GetSpecialization()
+    for binding, action in scope.GetActions() do
+      action:SetOverrideBinding(binding)
+    end
   end
   return next(...)
 end
