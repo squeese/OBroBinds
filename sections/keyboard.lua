@@ -385,9 +385,17 @@ do
     SaveBindings(GetCurrentBindingSet())
     button:Update()
   end
-  local function PromoteBinding(self, button, binding)
+  local function PromoteToAction(self, button, binding)
     CloseDropDownMenus()
     if scope.PromoteToAction(binding) then
+      SetBinding(binding, nil)
+      SaveBindings(GetCurrentBindingSet())
+      button:Update()
+    end
+  end
+  local function PromoteToMacroBlob(self, button, binding)
+    CloseDropDownMenus()
+    if scope.PromoteToMacroBlob(binding) then
       SetBinding(binding, nil)
       SaveBindings(GetCurrentBindingSet())
       button:Update()
@@ -400,9 +408,10 @@ do
     end
   end
   local function CreateBlob(self, button, binding)
-    scope.SaveAction(binding, "BLOB", binding, "", 3615513)
-    --button:Update()
     CloseDropDownMenus()
+    if scope.UpdateActionBlob(binding, binding, "", 3615513) then
+      button:Update()
+    end
   end
   local function EditBlob(self, button, binding)
     scope:dispatch("ADDON_EDITOR_SHOW")
@@ -496,13 +505,13 @@ do
       if kind == 'SPELL' or kind == 'MACRO' or kind == 'ITEM' then
         reset()
         info.text = "Promote to "..kind.." override"
-        info.func = PromoteBinding
+        info.func = PromoteToAction
         UIDropDownMenu_AddButton(info, 2)
       end
       if kind == 'MACRO' then
         reset()
         info.text = "Promote to BLOB override"
-        info.func = scope.ImportMacroToAction
+        info.func = PromoteToMacroBlob
         UIDropDownMenu_AddButton(info, 2)
       end
       reset()

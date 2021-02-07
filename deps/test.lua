@@ -1,3 +1,16 @@
+local inspect = require("./inspect")
+local unpack = table.unpack
+
+
+local t = {"BLOB"}
+t[6] = true
+
+local a = {unpack(t, 1, 6)}
+print(inspect(a))
+
+
+
+--[[G
 local function import(file, ...)
   local fp = io.open(file, "r")
   local body = fp:read("*a")
@@ -10,7 +23,6 @@ local function import(file, ...)
   return fn(...)
 end
 
-local inspect = require("./inspect")
 local scope = {}
 import("./utils.misc.lua", nil, scope)
 
@@ -801,3 +813,4 @@ run("#13 savedvariables", function(assert)
   local action = scope.GetAction("F6")
   print(diff, inspect(action))
 end)
+]]

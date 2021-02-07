@@ -307,20 +307,21 @@ end
 
 ------------------------------------------------------------------ ACTION
 scope.ACTION = {}
-scope.ACTION.kind  = 1
-scope.ACTION.id    = 2
-scope.ACTION.name  = 3
-scope.ACTION.body  = 3
-scope.ACTION.icon  = 4
-scope.ACTION.lock  = 5
-scope.ACTION.spell = "SPELL"
-scope.ACTION.macro = "MACRO"
-scope.ACTION.item  = "ITEM"
-scope.ACTION.blob  = "BLOB"
-scope.ACTION.SPELL = 1
-scope.ACTION.MACRO = 1
-scope.ACTION.ITEM  = 1
-scope.ACTION.BLOB  = 1
+scope.ACTION.kind   = 1
+scope.ACTION.id     = 2
+scope.ACTION.name   = 3
+scope.ACTION.body   = 3
+scope.ACTION.icon   = 4
+scope.ACTION.lock   = 5
+scope.ACTION.script = 6
+scope.ACTION.spell  = "SPELL"
+scope.ACTION.macro  = "MACRO"
+scope.ACTION.item   = "ITEM"
+scope.ACTION.blob   = "BLOB"
+scope.ACTION.SPELL  = 1
+scope.ACTION.MACRO  = 1
+scope.ACTION.ITEM   = 1
+scope.ACTION.BLOB   = 1
 
 do
   local NIL, ACTION = scope.NIL, scope.ACTION
@@ -374,6 +375,7 @@ do
     OBroBindsDB, changed = write(OBroBindsDB, CLASS, SPECC, ...)
     return changed
   end
+  scope.dbWriteAction = dbWriteAction
 
   function scope.GetAction(binding)
     return setmetatable(dbReadAction(binding) or NIL, ACTION)
@@ -442,6 +444,20 @@ do
       end
     end
 
+    function scope.UpdateActionBlob(binding, id, body, icon)
+      deleteAction(binding, ACTION.blob)
+      if scope.match(true,
+        dbWriteAction(binding, ACTION.kind, ACTION.blob),
+        dbWriteAction(binding, ACTION.id,   id),
+        dbWriteAction(binding, ACTION.body, body),
+        dbWriteAction(binding, ACTION.icon, icon or 134400)) then
+        dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
+        return true
+      end
+    end
+
+    --function scropt.UpdateActiobBlobIcon(binding, )
+
     function scope.UpdateAction(binding, kind, ...)
       if kind == ACTION.spell then
         return scope.UpdateActionSpell(binding, ...)
@@ -449,6 +465,8 @@ do
         return scope.UpdateActionItem(binding, ...)
       elseif kind == ACTION.macro then
         return scope.UpdateActionMacro(binding, ...)
+      elseif kind == ACTION.blob then
+        return scope.UpdateActionBlob(binding, ...)
       end
     end
   end
@@ -502,11 +520,11 @@ do
       elseif action.item then
         PickupItem(action.id)
       elseif action.blob then
-        local macro = CreateMacro("__OBRO_TMP", scope.ACtionIcon(action))
+        local macro = CreateMacro("__OBRO_TMP", scope.ActionIcon(action))
         PickupMacro(macro)
         DeleteMacro(macro)
         scope.enqueue("CURSOR_UPDATE", cleanup)
-        scope.__pickup = action
+        scope.__pickup = {unpack(action, 1, 6)}
       elseif action.kind then
         assert(false, "Unhandled pickup: "..action.kind)
       end
@@ -548,9 +566,10 @@ do
       local action = scope.__pickup
       ClearCursor()
       assert(scope.__pickup == nil)
-      return scope.match(true,
-        scope.PickupAction(binding),
-        scope.UpdateAction(binding, unpack(action, 1, 4)))
+      if scope.match(true, scope.PickupAction(binding), scope.dbWriteAction(binding, action)) then
+        dispatch(scope, "ADDON_ACTION_UPDATED", binding, scope.bindingModifiers(binding))
+        return true
+      end
 
     elseif kind == "macro" then
       ClearCursor()
@@ -584,6 +603,16 @@ do
       local id = link and select(4, string.find(link, "^|c%x+|H(%a+):(%d+)[|:]"))
       assert(name ~= nil)
       return scope.UpdateActionItem(binding, id, name, icon or 134400)
+    end
+  end
+
+  function scope.PromoteToMacroBlob(binding)
+    local _, name = string.match(GetBindingAction(binding, false), "^(%w+) (.*)$")
+    local _, icon, body = GetMacroInfo(name)
+    if icon and body then
+      return scope.UpdateActionBlob(binding, name, body, icon)
+    else
+      print("Macro", name, "not found")
     end
   end
 end

@@ -195,6 +195,7 @@ function scope.secureButtons:next(binding)
   return self[self.index]
 end
 
+
 function scope.secureButtons:release(binding)
   local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
   if index then
@@ -208,6 +209,7 @@ function scope.secureButtons:release(binding)
     self.index = self.index - 1
   end
 end
+
 
 function scope.ACTION:SetOverrideBinding(binding)
   if self.SPELL then
