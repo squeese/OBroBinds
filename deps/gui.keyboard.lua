@@ -339,8 +339,10 @@ do
       if action.script then
         local name = string.match(GetBindingAction(binding, true), "CLICK (OBroBindsSecureBlobButton%d+):LeftButton")
         local button = _G[name]
-        GameTooltip:AddLine(button:GetAttribute("macrotext"))
-        GameTooltip:AddLine(" ")
+        if button then
+          GameTooltip:AddLine(button:GetAttribute("macrotext"))
+          GameTooltip:AddLine(" ")
+        end
       end
       GameTooltip:AddLine(action.body)
       GameTooltip:Show()
@@ -367,16 +369,6 @@ do
   end
 end
 
-function scope.UpdateUnknownSpells(next, ...)
-  for binding, action in scope.GetActions() do
-    if action.spell and not action.id then
-      local icon, _, _, _, id = select(3, GetSpellInfo(action.name))
-      action[2], action[4] = id, icon or action.icon
-    end
-  end
-  return next(...)
-end
-
 do
   local function RemoveOverride(self, button, binding)
     CloseDropDownMenus()
@@ -395,6 +387,12 @@ do
     if scope.PromoteToAction(binding) then
       SetBinding(binding, nil)
       SaveBindings(GetCurrentBindingSet())
+      button:Update()
+    end
+  end
+  local function PromoteToMacroBlobFromOverride(self, button, binding)
+    CloseDropDownMenus()
+    if scope.PromoteToMacroBlobFromOverride(binding) then
       button:Update()
     end
   end
@@ -501,6 +499,12 @@ do
         reset()
         info.text = "Clear override"
         info.func = RemoveOverride
+        UIDropDownMenu_AddButton(info, 2)
+      end
+      if action.macro then
+        reset()
+        info.text = "Promote to BLOB override"
+        info.func = PromoteToMacroBlobFromOverride
         UIDropDownMenu_AddButton(info, 2)
       end
 

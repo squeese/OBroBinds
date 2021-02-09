@@ -42,6 +42,24 @@ do
   end
 end
 
+function scope.UpdateUnknownSpells(next, ...)
+
+  for binding, action in scope.GetActions() do
+    if action.spell and not action.id then
+      local icon, _, _, _, id = select(3, GetSpellInfo(action.name))
+      action[2], action[4] = id, icon or action.icon
+
+    elseif action.blob and not action.script and action.icon == 134400 then
+      local macro = CreateMacro("__TMP__", "INV_MISC_QUESTIONMARK", action.body)
+      _, icon = GetMacroInfo(macro)
+      DeleteMacro(macro)
+      action[4] = icon or action.icon
+    end
+  end
+  return next(...)
+end
+
+
 function dbReadAction(...)
   return dbRead(CLASS, SPECC, ...)
 end
@@ -168,6 +186,12 @@ function scope.ActionIcon(action)
 end
 
 do
+  local function copy(a, b)
+    for k, v in pairs(b) do
+      a[k] = v
+    end
+    return a
+  end
   local function cleanup(e, ...)
     scope.__pickup = nil
     scope.dequeue("CURSOR_UPDATE", cleanup)
@@ -187,7 +211,7 @@ do
         local macro = CreateMacro("__OBRO_TMP", scope.ActionIcon(action))
         PickupMacro(macro)
         DeleteMacro(macro)
-        scope.__pickup = action
+        scope.__pickup = copy(scope.poolAcquire(nil), action)
         scope.enqueue("CURSOR_UPDATE", cleanup)
       end
     elseif action.macro then
@@ -199,7 +223,8 @@ do
       PickupMacro(macro)
       DeleteMacro(macro)
       scope.enqueue("CURSOR_UPDATE", cleanup)
-      scope.__pickup = {unpack(action, 1, 6)}
+      --scope.__pickup = {unpack(action, 1, 6)}
+      scope.__pickup = copy(scope.poolAcquire(nil), action)
     elseif action.kind then
       assert(false, "Unhandled pickup: "..action.kind)
     end
@@ -289,4 +314,14 @@ function scope.PromoteToMacroBlob(binding)
   else
     print("Macro", name, "not found")
   end
+end
+
+function scope.PromoteToMacroBlobFromOverride(binding)
+  local name, icon = unpack(scope.GetAction(binding), 3, 4)
+  local mIcon, body = select(2, GetMacroInfo(name))
+  if not body then
+    print("Macro", name, "not found")
+    return false
+  end
+  return scope.UpdateActionBlob(binding, name, body, mIcon or icon)
 end

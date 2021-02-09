@@ -14,7 +14,7 @@ local function import(file, ...)
 end
 
 local scope = {}
-import("./utils.misc.lua", nil, scope)
+import("./utilities.lua", nil, scope)
 
 local function keys(tbl)
   local arr = {}
@@ -780,3 +780,7 @@ run("#13 savedvariables", function(assert)
   t, diff = test(false, t, scope.class, scope.spec, "F5", scope.ACTION.lock, true)
   t, diff = test(false, t, scope.class, scope.spec, "F5", scope.ACTION.kind, "SPELL")
 end)
+
+--local inspect = require("./inspect")
+--print(inspect(a))
+--print(inspect(b))

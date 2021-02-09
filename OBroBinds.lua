@@ -11,6 +11,8 @@ scope.enqueue("PLAYER_LOGIN", scope.poolAcquire(scope.STACK,
     if scope.dbRead("GUI", "open") then
       scope:dispatch("ADDON_ROOT_SHOW")
     end
+    --OBroBindsDB[scope.CLASS][scope.SPECC]["7"].__name = nil
+    --OBroBindsDB.__tmp = OBroBindsDB[scope.CLASS][scope.SPECC]
     return next(...)
   end
 ))
@@ -36,7 +38,6 @@ scope.enqueue("ADDON_KEYBOARD_SHOW", scope.poolAcquire(scope.STACK,
   scope.STACK.setup, scope.STACK.apply(scope, scope.dispatch, "ADDON_EDITOR_HIDE"),
   scope.STACK.setup, scope.STACK.apply(scope, scope.read, "KEYBOARD", scope.ROOT.Show),
   scope.STACK.clear, scope.STACK.apply(scope, scope.read, "KEYBOARD", scope.ROOT.Hide),
-  scope.STACK.once, scope.UpdateUnknownSpells,
   scope.STACK.once, function(next, ...)
     scope.STANCE_OFFSET  = 1   -- stance offset to the proper ACTIONBUTTON position
     scope.STANCE_BUTTONS = nil -- stance buttons
@@ -70,7 +71,8 @@ scope.enqueue("ADDON_KEYBOARD_SHOW", scope.poolAcquire(scope.STACK,
   scope.STACK.enqueue, "PLAYER_TALENT_UPDATE",           scope.UpdateUnknownSpells,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED",  scope.UpdateUnknownSpells,
   scope.STACK.enqueue, "ADDON_SHOW_DROPDOWN",            scope.UpdateDropdown,
-  scope.STACK.enqueue, "ADDON_ACTION_UPDATED",           scope.UpdateChangedActionButtons
+  scope.STACK.enqueue, "ADDON_ACTION_UPDATED",           scope.UpdateChangedActionButtons,
+  scope.STACK.once, scope.UpdateUnknownSpells
 ))
 
 scope.enqueue("ADDON_EDITOR_SHOW", scope.poolAcquire(scope.STACK,

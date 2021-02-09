@@ -315,6 +315,16 @@ do
   end
 end
 
+------------------------------------------------------------------ MISC
+do
+  local sgsub = gsub or string.gsub
+  function scope.TrimMacro(macro)
+    macro = sgsub(macro, "^%s*", "")
+    macro = sgsub(macro, "\n%s*", "\n")
+    return sgsub(macro, "%s+$", "")
+  end
+end
+
 ------------------------------------------------------------------ ACTION
 scope.ACTION = {}
 scope.ACTION.kind   = 1
@@ -337,14 +347,14 @@ local NIL, ACTION = scope.NIL, scope.ACTION
 function ACTION:__index(key)
   if self == NIL then return end
   local index = ACTION[key]
-  if type(index) ~= 'number' then
+  if index and type(index) ~= 'number' then
     return rawget(self, ACTION[index]) == index
   else
     return rawget(self, index)
   end
 end
 
------------------------------------------------------------------- ACTION
+------------------------------------------------------------------ MACROBUTTONS
 scope.MACROBUTTONS = {}
 scope.MACROBUTTONS.index = 0
 
@@ -370,7 +380,7 @@ do
   function scope.MACROBUTTONS:next(binding, action)
     local button
     if action.script then
-      local init, err = loadstring("local STACK, update = ...\n"..action.body)
+      local init, err = loadstring("local STACK, update, scope, binding = ...\n"..action.body)
       if err then
         print("Error loading BLOB: "..err)
         return nil
@@ -379,7 +389,7 @@ do
       button.update = button.update or function(text)
         update(button, text)
       end
-      button.stack = scope.poolAcquire(scope.STACK, init(scope.STACK, button.update))
+      button.stack = scope.poolAcquire(scope.STACK, init(scope.STACK, button.update, scope, binding))
       local chain = scope.poolAcquire(scope.CHAIN, button.stack)
       local ok, err = pcall(chain, "ADDON_BLOB_SETUP")
       scope.poolRelease(chain)
