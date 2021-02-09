@@ -1,9 +1,7 @@
 <Ui xmlns='http://www.blizzard.com/wow/ui/'>
   <Script file="deps\utils.misc.lua" />
-  <!--
-  <Script file="deps\utils.action.lua" />
-  -->
   <Script file="deps\layouts.lua" />
+  <Script file="sections\actions.lua" />
   <Script file="sections\root.lua" />
   <Script file="sections\keyboard.lua" />
   <Script file="sections\editor.lua" />

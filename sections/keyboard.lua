@@ -44,7 +44,6 @@ do
   end
 end
 
-
 local CreateActionButton
 do
   local function UpdateActionButton(self)

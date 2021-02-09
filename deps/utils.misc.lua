@@ -87,6 +87,10 @@ do
     return read(src[key], ...)
   end
   scope.read = read
+
+  function scope.dbRead(...)
+    return read(OBroBindsDB, ...)
+  end
 end
 
 do
@@ -141,6 +145,12 @@ do
     return poolRelease(src, nil), diff
   end
   scope.write = write
+
+  function scope.dbWrite(...)
+    local changed
+    OBroBindsDB, changed = write(OBroBindsDB, ...)
+    return changed
+  end
 end
 
 ---------------------------------------------------------------- CHAIN
@@ -323,296 +333,102 @@ scope.ACTION.MACRO  = 1
 scope.ACTION.ITEM   = 1
 scope.ACTION.BLOB   = 1
 
-do
-  local NIL, ACTION = scope.NIL, scope.ACTION
-  function ACTION:__index(key)
-    if self == NIL then return end
-    local index = ACTION[key]
-    if type(index) ~= 'number' then
-      return rawget(self, ACTION[index]) == index
-    else
-      return rawget(self, index)
-    end
-  end
-
-  --setmetatable(ACTION, ACTION)
-  --local action = setmetatable({ "SPELL" }, ACTION)
-  --print("ACTION.spell", ACTION.spell)
-  --print("ACTION.kind", ACTION.kind)
-  --print("action.spell", action.spell)
-  --print("action.kind", action.kind)
-  --local t = setmetatable(NIL, ACTION)
-  --print(t.spell)
-
-  local read = scope.read
-  local function dbRead(...)
-    return read(OBroBindsDB, ...)
-  end
-  scope.dbRead = dbRead
-
-  local write = scope.write
-  local function dbWrite(...)
-    local changed
-    OBroBindsDB, changed = write(OBroBindsDB, ...)
-    return changed
-  end
-  scope.dbWrite = dbWrite
-
-  local CLASS, SPECC = nil, nil
-  function scope.UpdatePlayerVariables(next, ...)
-    scope.CLASS = select(2, UnitClass("player"))
-    scope.SPECC = GetSpecialization()
-    CLASS, SPECC = scope.CLASS, scope.SPECC
-    return next(...)
-  end
-
-  local function dbReadAction(...)
-    return read(OBroBindsDB, CLASS, SPECC, ...)
-  end
-
-  local function dbWriteAction(...)
-    local changed
-    OBroBindsDB, changed = write(OBroBindsDB, CLASS, SPECC, ...)
-    return changed
-  end
-  scope.dbWriteAction = dbWriteAction
-
-  function scope.GetAction(binding)
-    return setmetatable(dbReadAction(binding) or NIL, ACTION)
-  end
-
-  do
-    local function iter(...)
-      local k, v = next(...)
-      return k, setmetatable(v or NIL, ACTION)
-    end
-    function scope.GetActions()
-      return iter, dbReadAction() or NIL
-    end
-  end
-
-  local dispatch = scope.dispatch
-  local bindingModifiers = scope.bindingModifiers
-  function scope.DeleteAction(binding)
-    if dbWriteAction(binding, nil) then
-      dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
-      return true
-    end
-  end
-
-  do
-    local function deleteAction(binding, kind)
-      local action = scope.GetAction(binding)
-      if action ~= NIL and action.kind ~= kind then
-        return scope.DeleteAction(binding)
-      end
-    end
-
-    function scope.UpdateActionSpell(binding, id, name, icon)
-      deleteAction(binding, ACTION.spell)
-      if scope.match(true,
-        dbWriteAction(binding, ACTION.kind, ACTION.spell),
-        dbWriteAction(binding, ACTION.id,   id),
-        dbWriteAction(binding, ACTION.name, name),
-        dbWriteAction(binding, ACTION.icon, icon or 134400)) then
-        dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
-        return true
-      end
-    end
-
-    function scope.UpdateActionItem(binding, id, name, icon)
-      deleteAction(binding, ACTION.item)
-      if scope.match(true,
-        dbWriteAction(binding, ACTION.kind, ACTION.item),
-        dbWriteAction(binding, ACTION.id,   id),
-        dbWriteAction(binding, ACTION.name, name),
-        dbWriteAction(binding, ACTION.icon, icon or 134400)) then
-        dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
-        return true
-      end
-    end
-
-    function scope.UpdateActionMacro(binding, id, name, icon)
-      deleteAction(binding, ACTION.macro)
-      if scope.match(true,
-        dbWriteAction(binding, ACTION.kind, ACTION.macro),
-        dbWriteAction(binding, ACTION.id,   id),
-        dbWriteAction(binding, ACTION.name, name),
-        dbWriteAction(binding, ACTION.icon, icon or 134400)) then
-        dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
-        return true
-      end
-    end
-
-    function scope.UpdateActionBlob(binding, id, body, icon)
-      deleteAction(binding, ACTION.blob)
-      if scope.match(true,
-        dbWriteAction(binding, ACTION.kind, ACTION.blob),
-        dbWriteAction(binding, ACTION.id,   id),
-        dbWriteAction(binding, ACTION.body, body),
-        dbWriteAction(binding, ACTION.icon, icon or 134400)) then
-        dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
-        return true
-      end
-    end
-
-    --function scropt.UpdateActiobBlobIcon(binding, )
-
-    function scope.UpdateAction(binding, kind, ...)
-      if kind == ACTION.spell then
-        return scope.UpdateActionSpell(binding, ...)
-      elseif kind == ACTION.item then
-        return scope.UpdateActionItem(binding, ...)
-      elseif kind == ACTION.macro then
-        return scope.UpdateActionMacro(binding, ...)
-      elseif kind == ACTION.blob then
-        return scope.UpdateActionBlob(binding, ...)
-      end
-    end
-  end
-
-  function scope.UpdateActionLock(binding)
-    local value = not dbReadAction(binding, ACTION.lock) and true or nil
-    if dbWriteAction(binding, ACTION.lock, value) then
-      dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
-      return true
-    end
-  end
-
-  function scope.ActionIcon(action)
-    if action.spell then
-      return select(3, GetSpellInfo(action.id)) or action.icon 
-    elseif action.macro then
-      return select(2, GetMacroInfo(action.name)) or action.icon
-    elseif action.item then
-      return select(10, GetItemInfo(action.id or 0)) or action.icon
-    elseif action.blob then
-      return action.icon or 441148
-    end
-    return action.icon or nil
-  end
-
-  do
-    local function cleanup(e, ...)
-      scope.__pickup = nil
-      scope.dequeue("CURSOR_UPDATE", cleanup)
-      return e(...)
-    end
-    function scope.PickupAction(binding)
-      if scope.PORTAL_BUTTONS[binding] then
-        PickupAction(scope.PORTAL_BUTTONS[binding] + scope.STANCE_OFFSET - 1)
-        return true
-      end
-      local action = scope.GetAction(binding)
-      if action.lock then
-        return false
-      elseif action.spell then
-        PickupSpell(action.id)
-        if not GetCursorInfo() then
-          local macro = CreateMacro("__OBRO_TMP", scope.ActionIcon(action))
-          PickupMacro(macro)
-          DeleteMacro(macro)
-          scope.__pickup = action
-          scope.enqueue("CURSOR_UPDATE", cleanup)
-        end
-      elseif action.macro then
-        PickupMacro(action.name)
-      elseif action.item then
-        PickupItem(action.id)
-      elseif action.blob then
-        local macro = CreateMacro("__OBRO_TMP", scope.ActionIcon(action))
-        PickupMacro(macro)
-        DeleteMacro(macro)
-        scope.enqueue("CURSOR_UPDATE", cleanup)
-        scope.__pickup = {unpack(action, 1, 6)}
-      elseif action.kind then
-        assert(false, "Unhandled pickup: "..action.kind)
-      end
-      return scope.DeleteAction(binding)
-    end
-  end
-
-  function scope.ReceiveAction(binding)
-    if scope.PORTAL_BUTTONS[binding] then
-      PlaceAction(scope.PORTAL_BUTTONS[binding] + scope.STANCE_OFFSET - 1)
-      return true
-    elseif scope.GetAction(binding).locked then
-      return false
-    end
-    local kind, id, link, arg1, arg2 = GetCursorInfo()
-    if kind == "spell" then
-      ClearCursor()
-      local id = arg2 or arg1
-      local name, _, icon = GetSpellInfo(id)
-      assert(id ~= nil)
-      assert(name ~= nil)
-      assert(icon ~= nil)
-      return scope.match(true,
-        scope.PickupAction(binding),
-        scope.UpdateActionSpell(binding, id, name, icon))
-
-    elseif kind == "item" then
-      ClearCursor()
-      local name = select(3, string.match(link, "^|c%x+|H(%a+):(%d+).+|h%[([^%]]+)"))
-      local icon = select(10, GetItemInfo(id))
-      assert(link ~= nil)
-      assert(name ~= nil)
-      assert(icon ~= nil)
-      return scope.match(true,
-        scope.PickupAction(binding),
-        scope.UpdateActionItem(binding, id, name, icon))
-
-    elseif kind == "macro" and id == 0 then
-      local action = scope.__pickup
-      ClearCursor()
-      assert(scope.__pickup == nil)
-      if scope.match(true, scope.PickupAction(binding), scope.dbWriteAction(binding, action)) then
-        dispatch(scope, "ADDON_ACTION_UPDATED", binding, scope.bindingModifiers(binding))
-        return true
-      end
-
-    elseif kind == "macro" then
-      ClearCursor()
-      local name, icon = GetMacroInfo(id)
-      assert(type(id) == "number")
-      assert(id ~= nil)
-      assert(name ~= nil)
-      assert(icon ~= nil)
-      return scope.match(true,
-        scope.PickupAction(binding),
-        scope.UpdateActionMacro(binding, id, name, icon))
-
-    elseif kind then
-      assert(false, "Unhandled receive: "..kind)
-    end
-  end
-
-  function scope.PromoteToAction(binding)
-    local kind, name = string.match(GetBindingAction(binding, false), "^(%w+) (.*)$")
-    if kind == 'SPELL' then
-      local icon, _, _, _, id = select(3, GetSpellInfo(name))
-      assert(name ~= nil)
-      return scope.UpdateActionSpell(binding, id, name, icon or 134400)
-    elseif kind == 'MACRO' then
-      local id = GetMacroIndexByName(name)
-      local icon = select(2, GetMacroInfo(name))
-      assert(name ~= nil)
-      return scope.UpdateActionMacro(binding, id, name, icon or 134400)
-    elseif kind == 'ITEM' then
-      local link, _, _, _, _, _, _, _, icon = select(2, GetItemInfo(name))
-      local id = link and select(4, string.find(link, "^|c%x+|H(%a+):(%d+)[|:]"))
-      assert(name ~= nil)
-      return scope.UpdateActionItem(binding, id, name, icon or 134400)
-    end
-  end
-
-  function scope.PromoteToMacroBlob(binding)
-    local _, name = string.match(GetBindingAction(binding, false), "^(%w+) (.*)$")
-    local _, icon, body = GetMacroInfo(name)
-    if icon and body then
-      return scope.UpdateActionBlob(binding, name, body, icon)
-    else
-      print("Macro", name, "not found")
-    end
+local NIL, ACTION = scope.NIL, scope.ACTION
+function ACTION:__index(key)
+  if self == NIL then return end
+  local index = ACTION[key]
+  if type(index) ~= 'number' then
+    return rawget(self, ACTION[index]) == index
+  else
+    return rawget(self, index)
   end
 end
+
+------------------------------------------------------------------ ACTION
+scope.MACROBUTTONS = {}
+scope.MACROBUTTONS.index = 0
+
+do
+  local MACROBUTTONS = scope.MACROBUTTONS
+  local function getNextButton()
+    MACROBUTTONS.index = MACROBUTTONS.index + 1
+    if MACROBUTTONS.index > #MACROBUTTONS then
+      local button = CreateFrame("Button", "OBroBindsSecureBlobButton"..MACROBUTTONS.index, nil, "SecureActionButtonTemplate")
+      button:RegisterForClicks("AnyUp")
+      button:SetAttribute("type", "macro")
+      button.command = "CLICK "..button:GetName()..":LeftButton"
+      tinsert(MACROBUTTONS, button)
+    end
+    return MACROBUTTONS[MACROBUTTONS.index]
+  end
+
+  local function update(button, text)
+    if InCombatLockdown() then return end
+    button:SetAttribute("macrotext", text)
+  end
+
+  function scope.MACROBUTTONS:next(binding, action)
+    local button
+    if action.script then
+      local init, err = loadstring("local STACK, update = ...\n"..action.body)
+      if err then
+        print("Error loading BLOB: "..err)
+        return nil
+      end
+      button = getNextButton()
+      button.update = button.update or function(text)
+        update(button, text)
+      end
+      button.stack = scope.poolAcquire(scope.STACK, init(scope.STACK, button.update))
+      local chain = scope.poolAcquire(scope.CHAIN, button.stack)
+      local ok, err = pcall(chain, "ADDON_BLOB_SETUP")
+      scope.poolRelease(chain)
+      if not ok then
+        print("Error setup BLOB", err)
+        scope.poolRelease(button.stack)
+        button.stack = nil
+        MACROBUTTONS.index = MACROBUTTONS.index - 1
+        return nil
+      end
+    else
+      button = getNextButton()
+      button:SetAttribute("macrotext", action.body)
+    end
+    return button.command
+  end
+end
+
+do
+  local function reset(button)
+    if button.stack then
+      local chain = scope.poolAcquire(scope.CHAIN, button.stack)
+      local ok, err = pcall(chain, "ADDON_BLOB_CLEAR")
+      scope.poolRelease(chain)
+      scope.poolRelease(button.stack)
+      button.stack = nil
+      if not ok then
+        print("Error clear BLOB", err)
+      end
+    end
+  end
+
+  local smatch = string.match
+  function scope.MACROBUTTONS:release(binding)
+    local index = smatch(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
+    if index then
+      local button = table.remove(self, tonumber(index))
+      reset(button)
+      tinsert(self, button)
+      self.index = self.index - 1
+    end
+  end
+
+  function scope.MACROBUTTONS:reset()
+    for i = 1, self.index do
+      reset(self[i])
+    end
+    self.index = 0
+  end
+end
+
+
