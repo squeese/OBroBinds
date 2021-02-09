@@ -1,4 +1,4 @@
-local inspect = require("./inspect")
+--local inspect = require("./inspect")
 local unpack = table.unpack
 
 local function import(file, ...)
@@ -757,8 +757,8 @@ run("#13 savedvariables", function(assert)
     local tr, diff = scope.write(ti, ...)
     if diff ~= expected then
       print(...)
-      print("input", inspect(ti))
-      print("outpt", inspect(tr))
+      --print("input", inspect(ti))
+      --print("outpt", inspect(tr))
       assert(false)
     end
     return tr, diff

@@ -1,10 +1,10 @@
 <Ui xmlns='http://www.blizzard.com/wow/ui/'>
-  <Script file="deps\utils.misc.lua" />
+  <Script file="deps\utilities.lua" />
   <Script file="deps\layouts.lua" />
-  <Script file="sections\actions.lua" />
-  <Script file="sections\root.lua" />
-  <Script file="sections\keyboard.lua" />
-  <Script file="sections\editor.lua" />
+  <Script file="deps\actions.lua" />
+  <Script file="deps\gui.frames.lua" />
+  <Script file="deps\gui.keyboard.lua" />
+  <Script file="deps\gui.editor.lua" />
 
   <Button name="OBroBindsLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTemplate" virtual="true">
     <Size>
