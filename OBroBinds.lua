@@ -1,95 +1,132 @@
 local scope = select(2, ...)
 scope.ROOT = scope.CreateRootFrame()
 
---local chain = scope.poolAcquire(scope.CHAIN)
---local stack = scope.poolAcquire(scope.STACK,
-  --scope.STACK.enqueue, "ADDON_TEST", function(next, ...)
-    --print("ok", ...)
-    --return next(...)
-  --end,
-  --scope.STACK.once, function(next, ...)
-    --print("init", ...)
-    --return next(...)
-  --end
---)
-
---local n = 0
---C_Timer.NewTicker(0.5, function()
-  --n = n + 1
-  --scope:dispatch("ADDON_TEST", n)
---end)
-
---C_Timer.NewTicker(2, function()
-  --scope.push(chain, stack)(3, 2, 1)
---end)
-
-
-  --local tbl = {button, }
-  --local function update(text)
-    --print("update", text)
-  --end
-
-
-do
-
-  local function update(text)
-    print("update", text)
-  end
-
-  local macro = [[
-    return
-      STACK.enqueue, "ADDON_TEST", function(next, ...)
-        update("hello world")
-        return next(...)
-      end,
-      STACK.once, function(next, ...)
-        print("init", ...)
-        return next(...)
-      end
-  ]]
-
-  local init, err = loadstring([[
-    local STACK, update = ...
-  ]]..macro)
-
-  local stack = scope.poolAcquire(scope.STACK, init(scope.STACK, update))
-  local chain = scope.poolAcquire(scope.CHAIN)
-
-  -- enable
-  print(scope.push(chain, stack)(1, 2, 3))
-  scope:dispatch("ADDON_TEST", 1, 2, 3)
-  scope:dispatch("ADDON_TEST", 1, 2, 3)
-
-end
-
-
 local MACROBUTTONS = {}
 MACROBUTTONS.index = 0
 
-function MACROBUTTONS:Create()
-  self.index = self.index+1
-  local button = CreateFrame("Button", "OBroBindsSecureBlobButton"..self.index, nil, "SecureActionButtonTemplate")
-  button:RegisterForClicks("AnyUp")
-  button:SetAttribute("type", "macro")
-  button.command = "CLICK "..button:GetName()..":LeftButton"
-  table.insert(self, button)
+--[[
+return
+  STACK.setup, function(next, ...)
+    print("setup")
+    return next(...)
+  end,
+  STACK.clear, function(next, ...)
+    print("clear")
+    return next(...)
+  end
+--]]
+
+do
+  local function getNextButton()
+    MACROBUTTONS.index = MACROBUTTONS.index + 1
+    if MACROBUTTONS.index > #MACROBUTTONS then
+      local button = CreateFrame("Button", "OBroBindsSecureBlobButton"..MACROBUTTONS.index, nil, "SecureActionButtonTemplate")
+      button:RegisterForClicks("AnyUp")
+      button:SetAttribute("type", "macro")
+      button.command = "CLICK "..button:GetName()..":LeftButton"
+      table.insert(MACROBUTTONS, button)
+    end
+    return MACROBUTTONS[MACROBUTTONS.index]
+  end
+
+  local function update(button, text)
+    if InCombatLockdown() then return end
+    button:SetAttribute("macrotext", text)
+  end
+
+  function MACROBUTTONS:next(binding, action)
+    local button
+    if action.script then
+      local init, err = loadstring("local STACK, update = ...\n"..action.body)
+      if err then
+        print("Error loading BLOB: "..err)
+        return nil
+      end
+      button = getNextButton()
+      button.update = button.update or function(text)
+        update(button, text)
+      end
+      button.stack = scope.poolAcquire(scope.STACK, init(scope.STACK, button.update))
+      local chain = scope.poolAcquire(scope.CHAIN, button.stack)
+      local ok, err = pcall(chain, "ADDON_BLOB_SETUP")
+      scope.poolRelease(chain)
+      if not ok then
+        print("Error setup BLOB", err)
+        scope.poolRelease(button.stack)
+        button.stack = nil
+        MACROBUTTONS.index = MACROBUTTONS.index - 1
+        return nil
+      end
+    else
+      button = getNextButton()
+      button:SetAttribute("macrotext", action.body)
+    end
+    return button.command
+  end
+end
+
+do
+  local function reset(button)
+    if button.stack then
+      local chain = scope.poolAcquire(scope.CHAIN, button.stack)
+      local ok, err = pcall(chain, "ADDON_BLOB_CLEAR")
+      scope.poolRelease(chain)
+      scope.poolRelease(button.stack)
+      button.stack = nil
+      if not ok then
+        print("Error clear BLOB", err)
+      end
+    end
+  end
+
+  local smatch = string.match
+  function MACROBUTTONS:release(binding)
+    local index = smatch(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
+    if index then
+      local button = table.remove(self, tonumber(index))
+      reset(button)
+      table.insert(self, button)
+      self.index = self.index - 1
+    end
+  end
+
+  function MACROBUTTONS:reset()
+    for i = 1, self.index do
+      reset(self[i])
+    end
+    self.index = 0
+  end
+end
 
 
-
-
-  return button
+function scope.SetOverrideBinding(binding, action)
+  if action.spell then
+    SetOverrideBindingSpell(scope.ROOT, false, binding, GetSpellInfo(action.id) or action.name)
+  elseif action.macro then
+    SetOverrideBindingMacro(scope.ROOT, false, binding, action.name)
+  elseif action.item then
+    SetOverrideBindingItem(scope.ROOT, false, binding, action.name)
+  elseif action.blob then
+    SetOverrideBinding(scope.ROOT, false, binding, MACROBUTTONS:next(binding, action))
+  end
 end
 
 function scope.UpdatePlayerBindings(next, ...)
   ClearOverrideBindings(scope.ROOT)
+  MACROBUTTONS:reset()
+  for binding, action in scope.GetActions() do
+    scope.SetOverrideBinding(binding, action)
+  end
   return next(...)
 end
 
 scope.enqueue("ADDON_ACTION_UPDATED", function(next, event, binding, ...)
-  -- SetOverrideBinding(scope.ROOT, false, binding, nil)
-  --local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
   local action = scope.GetAction(binding)
-  print("update", binding, action.kind)
+  MACROBUTTONS:release(binding)
+  SetOverrideBinding(scope.ROOT, false, binding, nil)
+  if action.kind then
+    scope.SetOverrideBinding(binding, action)
+  end
   return next(...)
 end)
 
@@ -103,8 +140,6 @@ scope.enqueue("PLAYER_LOGIN", scope.poolAcquire(scope.STACK,
     if scope.dbRead("GUI", "open") then
       scope:dispatch("ADDON_ROOT_SHOW")
     end
-    --local v = OBroBindsDB.__tmp[1]["SHIFT-3"][3]
-    --OBroBindsDB[scope.CLASS][scope.SPECC]["3"][3] = v
     return next(...)
   end
 ))
@@ -118,8 +153,8 @@ scope.enqueue("ADDON_ROOT_SHOW", scope.poolAcquire(scope.STACK,
     scope.KEYBOARD = scope.CreateKeyboardFrame()
     scope.EDITOR = scope.CreateEditorFrame()
     scope:dispatch("ADDON_KEYBOARD_SHOW")
-    scope:dispatch("ADDON_EDITOR_SHOW")
-    scope:dispatch("ADDON_EDITOR_SELECT", "3")
+    --scope:dispatch("ADDON_EDITOR_SHOW")
+    --scope:dispatch("ADDON_EDITOR_SELECT", "3")
     return next(...)
   end
 ))

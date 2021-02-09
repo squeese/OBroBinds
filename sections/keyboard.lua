@@ -36,7 +36,7 @@ do
     scope.InitializeKeyboardStanceButtons = nil
     if scope.CLASS == "ROGUE" then
       scope.write(scope, 'STANCE_BUTTONS', scope.push, CreateStanceButton(73,  'ability_stealth',            1, 2, 3))
-    elseif true or scope.CLASS == "DRUID" then
+    elseif scope.CLASS == "DRUID" then
       scope.write(scope, 'STANCE_BUTTONS', scope.push, CreateStanceButton(97,  'ability_racial_bearform',    1, 2, 3, 4))
       scope.write(scope, 'STANCE_BUTTONS', scope.push, CreateStanceButton(73,  'ability_druid_catform',      1, 2, 3, 4))
       scope.write(scope, 'STANCE_BUTTONS', scope.push, CreateStanceButton(109, 'spell_nature_forceofnature', 1))
@@ -337,7 +337,13 @@ do
       end
     elseif action.blob then
       GameTooltip:SetText("BLOB "..action.id)
-      GameTooltip:AddLine(action.name)
+      if action.script then
+        local name = string.match(GetBindingAction(binding, true), "CLICK (OBroBindsSecureBlobButton%d+):LeftButton")
+        local button = _G[name]
+        GameTooltip:AddLine(button:GetAttribute("macrotext"))
+        GameTooltip:AddLine(" ")
+      end
+      GameTooltip:AddLine(action.body)
       GameTooltip:Show()
 
     elseif GetBindingAction(binding, false) ~= "" then

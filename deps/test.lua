@@ -1,15 +1,6 @@
 local inspect = require("./inspect")
 local unpack = table.unpack
 
-
-local t = {"BLOB"}
-t[6] = true
-
-local a = {unpack(t, 1, 6)}
-print(inspect(a))
-
-
-
 --[[G
 local function import(file, ...)
   local fp = io.open(file, "r")

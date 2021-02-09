@@ -174,6 +174,7 @@ scope.secureButtons = { index = 0 }
 
 function scope.secureButtons:next(binding)
   local index = string.match(GetBindingAction(binding, true), "CLICK OBroBindsSecureBlobButton(%d+):LeftButton")
+  
   if index then
     local button = self[tonumber(index)]
     if button.stack then
@@ -231,6 +232,7 @@ function scope.ACTION:SetOverrideBinding(binding)
       end
     end
     -- TODO: pcall
+    -- 
     local init, err = loadstring([[
       local STACK, update = ...
     ]]..self.text)
