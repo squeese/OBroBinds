@@ -97,8 +97,8 @@ end
 
 hooksecurefunc("ChatEdit_InsertLink", function(text)
   if not text then return end
-  if not scope.editor.body then return end
-  if not scope.editor:IsVisible() then return end
+  if not scope.EDITOR:IsVisible() then return end
+  if not scope.EDITOR.nameInput then return end
   if ChatEdit_GetActiveWindow() then return end
   if BrowseName and BrowseName:IsVisible() then return end
   if MacroFrameText and MacroFrameText:IsVisible() then return end
@@ -110,18 +110,20 @@ hooksecurefunc("ChatEdit_InsertLink", function(text)
     text = GetSpellInfo(id)
   elseif kind == "talent" and name then
     text = GetSpellInfo(name) or name
+  elseif kind == "pvptal" and name then
+    text = name
   end
-  if scope.editor.body:GetText() == "" then
+  if scope.EDITOR.bodyInput:GetText() == "" then
     if kind == "item" then
       if GetItemSpell(text) then
-        return scope.editor.body:Insert(SLASH_USE1.." "..text);
+        return scope.EDITOR.bodyInput:Insert(SLASH_USE1.." "..text);
       end
-      return scope.editor.body:Insert(SLASH_EQUIP1.." "..text);
-    elseif kind == "spell" or kind == "talent" then
-      return scope.editor.body:Insert(SLASH_CAST1.." "..text);
+      return scope.EDITOR.bodyInput:Insert(SLASH_EQUIP1.." "..text);
+    elseif kind == "spell" or kind == "talent" or kind == "pvptal" then
+      return scope.EDITOR.bodyInput:Insert(SLASH_CAST1.." "..text);
     end
   end
-  scope.editor.body:Insert(text)
+  scope.EDITOR.bodyInput:Insert(text)
 end)
 
 local function OnClickIcon(self)

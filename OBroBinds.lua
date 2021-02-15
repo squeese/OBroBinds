@@ -11,8 +11,6 @@ scope.enqueue("PLAYER_LOGIN", scope.poolAcquire(scope.STACK,
     if scope.dbRead("GUI", "open") then
       scope:dispatch("ADDON_ROOT_SHOW")
     end
-    --OBroBindsDB[scope.CLASS][scope.SPECC]["7"].__name = nil
-    --OBroBindsDB.__tmp = OBroBindsDB[scope.CLASS][scope.SPECC]
     return next(...)
   end
 ))
@@ -27,8 +25,6 @@ scope.enqueue("ADDON_ROOT_SHOW", scope.poolAcquire(scope.STACK,
     scope.KEYBOARD = scope.CreateKeyboardFrame()
     scope.EDITOR = scope.CreateEditorFrame()
     scope:dispatch("ADDON_KEYBOARD_SHOW")
-    --scope:dispatch("ADDON_EDITOR_SHOW")
-    --scope:dispatch("ADDON_EDITOR_SELECT", "3")
     return next(...)
   end
 ))
@@ -52,6 +48,7 @@ scope.enqueue("ADDON_KEYBOARD_SHOW", scope.poolAcquire(scope.STACK,
   scope.STACK.setup,   scope.UpdateKeyboardStanceButtons,
   scope.STACK.setup,   scope.UpdateKeyboardMainbarIndices,
   scope.STACK.setup,   scope.UpdateKeyboardActionButtons,
+  scope.STACK.once,    scope.UpdateUnknownSpells
   scope.STACK.enqueue, "ADDON_UPDATE_LAYOUT",            scope.UpdateKeyboardLayout,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED",  scope.UpdateKeyboardStanceButtons,
   scope.STACK.enqueue, "ADDON_OFFSET_CHANGED",           scope.UpdateKeyboardStanceButtons,
@@ -62,6 +59,7 @@ scope.enqueue("ADDON_KEYBOARD_SHOW", scope.poolAcquire(scope.STACK,
   scope.STACK.enqueue, "PLAYER_TALENT_UPDATE",           scope.UpdateKeyboardActionButtons,
   scope.STACK.enqueue, "UPDATE_MACROS",                  scope.UpdateKeyboardActionButtons,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED",  scope.UpdateKeyboardActionButtons,
+  scope.STACK.enqueue, "UPDATE_BINDINGS",                scope.UpdateKeyboardActionButtons,
   scope.STACK.enqueue, "ADDON_SHOW_TOOLTIP",             scope.UpdateTooltip,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED",  scope.RefreshTooltip,
   scope.STACK.enqueue, "ADDON_MODIFIER_CHANGED",         scope.RefreshTooltip,
@@ -72,7 +70,6 @@ scope.enqueue("ADDON_KEYBOARD_SHOW", scope.poolAcquire(scope.STACK,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED",  scope.UpdateUnknownSpells,
   scope.STACK.enqueue, "ADDON_SHOW_DROPDOWN",            scope.UpdateDropdown,
   scope.STACK.enqueue, "ADDON_ACTION_UPDATED",           scope.UpdateChangedActionButtons,
-  scope.STACK.once, scope.UpdateUnknownSpells
 ))
 
 scope.enqueue("ADDON_EDITOR_SHOW", scope.poolAcquire(scope.STACK,
