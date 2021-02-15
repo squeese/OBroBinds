@@ -1,4 +1,4 @@
-local addon = select(2, ...)
+local scope = select(2, ...)
 
 OBroBindsBlobListMixin = {}
 function OBroBindsBlobListMixin:OnLoad()
