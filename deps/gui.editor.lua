@@ -1,37 +1,42 @@
 local scope = select(2, ...)
 local EDITOR
-OBroBindsLineMixin = {}
-OBroBindsListMixin = {}
+OBroBindsIconLineMixin = {}
+OBroBindsIconListMixin = {}
 
-function scope.EditorSelect(next, event, binding, ...)
+function scope.EditorSelect(next, event, index, ...)
   EDITOR = scope.EDITOR
   if not EDITOR.DIRTY then
-    EDITOR.ACTION = scope.GetAction(binding)
-    if EDITOR.ACTION == scope.NIL then
+    EDITOR.DIRTY = false
+    EDITOR.BLOB = scope.dbRead("BLOBS", index)
+    if not EDITOR.BLOB then
       scope:dispatch("ADDON_KEYBOARD_SHOW")
-      return next, event, binding, ...
+      return next, event, index, ...
     end
-    EDITOR.BINDING = binding
-    EDITOR.iconButton.icon:SetTexture(EDITOR.ACTION.icon)
-    EDITOR.bodyInput:SetText(EDITOR.ACTION.body)
-    EDITOR.nameInput:SetText(EDITOR.ACTION.id)
-    EDITOR.scriptToggle:SetChecked(EDITOR.ACTION.script)
+    EDITOR.index = index
+    EDITOR.iconButton.icon:SetTexture(EDITOR.BLOB.icon)
+    EDITOR.bodyInput:SetText(EDITOR.BLOB.body)
+    EDITOR.nameInput:SetText(EDITOR.BLOB.name)
+    EDITOR.scriptToggle:SetChecked(EDITOR.BLOB.script)
     EDITOR.saveButton:SetEnabled(false)
     EDITOR.cancelButton:SetEnabled(false)
     EDITOR.closeButton:SetEnabled(true)
-    return next(event, binding, ...)
+    return next(event, index, ...)
   end
-  return next, event, binding, ...
+  return next, event, index, ...
 end
 
 function scope.EditorUpdateButtons(next, ...)
-  if EDITOR.ACTION then
-    EDITOR.DIRTY = (EDITOR.ACTION.body   ~= EDITOR.bodyInput:GetText())
-                or (EDITOR.ACTION.id     ~= EDITOR.nameInput:GetText())
-                or (EDITOR.ACTION.script ~= (EDITOR.scriptToggle:GetChecked() and true or nil))
-    EDITOR.saveButton:SetEnabled(EDITOR.DIRTY)
-    EDITOR.cancelButton:SetEnabled(EDITOR.DIRTY)
-    EDITOR.closeButton:SetEnabled(not EDITOR.DIRTY)
+  if EDITOR.BLOB then
+    local dirty = (EDITOR.BLOB.body   ~= EDITOR.bodyInput:GetText())
+               or (EDITOR.BLOB.name   ~= EDITOR.nameInput:GetText())
+               or (EDITOR.BLOB.script ~= (EDITOR.scriptToggle:GetChecked() and true or nil))
+    EDITOR.saveButton:SetEnabled(dirty)
+    EDITOR.cancelButton:SetEnabled(dirty)
+    EDITOR.closeButton:SetEnabled(not dirty)
+    --if EDITOR.DIRTY ~= dirty then
+      --scope:dispatch("ADDON_SELECTOR_LOCK", dirty)
+    --end
+    EDITOR.DIRTY = dirty
   end
   return next(...)
 end
@@ -44,6 +49,9 @@ function scope.EditorUndo(next, ...)
 end
 
 function scope.EditorCleanup(next, ...)
+  --if EDITOR.DIRTY then
+    --scope:dispatch("ADDON_SELECTOR_LOCK", false)
+  --end
   EDITOR.DIRTY = false
   EDITOR.ACTION = nil
   EDITOR.BINDING = nil
@@ -54,14 +62,26 @@ end
 
 function scope.EditorSave(next, ...)
   local binding = EDITOR.BINDING
-  if scope.match(true,
-      scope.dbWriteAction(binding, scope.ACTION.id, EDITOR.nameInput:GetText()),
-      scope.dbWriteAction(binding, scope.ACTION.body, EDITOR.bodyInput:GetText()),
-      scope.dbWriteAction(binding, scope.ACTION.script, EDITOR.scriptToggle:GetChecked() and true or nil)) then
-    scope:dispatch("ADDON_ACTION_UPDATED", binding, scope.bindingModifiers(binding))
+  --if scope.match(true,
+      --scope.dbWriteAction(binding, scope.ACTION.id, EDITOR.nameInput:GetText()),
+      --scope.dbWriteAction(binding, scope.ACTION.body, EDITOR.bodyInput:GetText()),
+      --scope.dbWriteAction(binding, scope.ACTION.script, EDITOR.scriptToggle:GetChecked() and true or nil)) then
+  --end
+  scope.dbWrite("BLOBS", EDITOR.index, "name", EDITOR.nameInput:GetText())
+  scope.dbWrite("BLOBS", EDITOR.index, "body", EDITOR.bodyInput:GetText())
+  scope.dbWrite("BLOBS", EDITOR.index, "script", EDITOR.scriptToggle:GetChecked() and true or nil)
+  for binding, action in scope.GetActions() do
+    if action.blob and action.id == EDITOR.index then
+      scope:dispatch("ADDON_ACTION_UPDATED", binding, scope.bindingModifiers(binding))
+    end
+  end
+
+  if scope.SELECTOR.list then
+    scope.SELECTOR.list:RefreshListDisplay()
   end
   EDITOR.DIRTY = false
-  scope:dispatch("ADDON_EDITOR_SELECT", EDITOR.BINDING)
+  --scope:dispatch("ADDON_SELECTOR_LOCK", false)
+  scope:dispatch("ADDON_EDITOR_SELECT", EDITOR.index)
   return next(...)
 end
 
@@ -69,7 +89,7 @@ function scope.EditorToggleIcons(next, event, open, ...)
   if not EDITOR.iconScroller then
     EDITOR.iconFiles = {134400}
     GetMacroIcons(EDITOR.iconFiles)
-    EDITOR.iconScroller = CreateFrame("frame", nil, EDITOR, "OBroBindsListTemplate")
+    EDITOR.iconScroller = CreateFrame("frame", nil, EDITOR, "OBroBindsIconListTemplate")
   end
   if open then
     EDITOR.iconScroller:Show()
@@ -89,8 +109,9 @@ function scope.EditorChangeIcon(next, event, row, col, ...)
     DeleteMacro(macro)
   end
   EDITOR.iconButton.icon:SetTexture(icon)
-  if scope.dbWriteAction(EDITOR.BINDING, scope.ACTION.icon, icon) then
-    scope:dispatch("ADDON_ACTION_UPDATED", EDITOR.BINDING, scope.bindingModifiers(EDITOR.BINDING))
+  scope.dbWrite("BLOBS", EDITOR.index, "icon", icon)
+  if scope.SELECTOR.list then
+    scope.SELECTOR.list:RefreshListDisplay()
   end
   return next(event, row, col, ...)
 end
@@ -130,7 +151,7 @@ local function OnClickIcon(self)
   scope:dispatch("ADDON_EDITOR_CHANGE_ICON", self:GetParent().listIndex, self.index)
 end
 
-function OBroBindsLineMixin:InitElement(...)
+function OBroBindsIconLineMixin:InitElement(...)
   self.HighlightTexture:Hide()
   self:SetNormalTexture(nil)
   local prev
@@ -146,7 +167,7 @@ function OBroBindsLineMixin:InitElement(...)
   end
 end
 
-function OBroBindsLineMixin:UpdateDisplay()
+function OBroBindsIconLineMixin:UpdateDisplay()
   local count = #scope.EDITOR.iconFiles
   local base = self.listIndex-1
   for i = 1, 5 do
@@ -160,7 +181,7 @@ function OBroBindsLineMixin:UpdateDisplay()
   end
 end
 
-function OBroBindsListMixin:OnLoad()
+function OBroBindsIconListMixin:OnLoad()
   self.ArtOverlay.SelectedHighlight:SetAlpha(0)
   self.InsetFrame:Hide()
   self.ScrollFrame.scrollBar.Background:Hide()
@@ -169,7 +190,7 @@ function OBroBindsListMixin:OnLoad()
   self.ScrollFrame.scrollBar.ScrollBarBottom:Hide()
   self:SetPoint("TOPLEFT", 18, -68)
   self:SetPoint("BOTTOMRIGHT", self:GetParent(), "BOTTOMLEFT", 256, 52)
-  self:SetElementTemplate("OBroBindsLineTemplate")
+  self:SetElementTemplate("OBroBindsIconLineTemplate")
   self:SetGetNumResultsFunction(function(...)
     return math.ceil(#scope.EDITOR.iconFiles / 5)
   end)

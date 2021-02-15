@@ -29,6 +29,7 @@ function scope.CreatePanelFrame()
   end)
   panel:SetScript("OnDragStop", function()
     scope.ROOT:StopMovingOrSizing()
+    scope:dispatch("ADDON_ROOT_MOVED")
   end)
   return panel
 end
@@ -47,6 +48,65 @@ function scope.CreateEditorFrame()
   editor:SetAllPoints()
   editor:Hide()
   return editor
+end
+
+function scope.CreateSelectorFrame()
+  scope.CreateSelectorFrame = nil
+  local selector = CreateFrame("frame", nil, scope.ROOT, nil)
+  selector:SetPoint("TOPLEFT", scope.PANEL, "TOPRIGHT", -6, 0)
+  selector:SetWidth(200)
+  selector:Hide()
+  selector:Lower()
+
+  local function texture(left, right, ...)
+    local texture = selector:CreateTexture(nil, "OVERLAY")
+    texture:SetTexture("Interface\\PaperDollInfoFrame\\UI-GearManager-Border")
+    texture:SetTexCoord(left, right, 0, 1)
+    texture:SetSize(64, 64)
+    for i = 1, select("#", ...), 5 do
+      texture:SetPoint(select(i, ...))
+    end
+    return texture
+  end
+
+  local TOPR = texture(0.625, 0.507953125, "TOPRIGHT")
+  local BOTR = texture(0.875, 1, "BOTTOMRIGHT")
+  texture(0.25, 0.369140625, "TOPLEFT", selector, "TOPLEFT", 0, 0, "TOPRIGHT", TOPR, "TOPLEFT", 0, 0)
+  texture(0.376953125, 0.498046875, "BOTTOMLEFT", selector, "BOTTOMLEFT", 0, 0, "BOTTOMRIGHT", BOTR, "BOTTOMLEFT", 0, 0)
+  texture(0.1171875, 0.2421875, "TOPRIGHT", TOPR, "BOTTOMRIGHT", 0, 0, "BOTTOMRIGHT", BOTR, "TOPRIGHT", 0, 0)
+
+  local titleBG = selector:CreateTexture(nil, "BACKGROUND")
+  titleBG:SetTexture("Interface\\PaperDollInfoFrame\\UI-GearManager-Title-Background")
+  titleBG:SetPoint("TOPLEFT", 0, -6)
+  titleBG:SetPoint("BOTTOMRIGHT", selector, "TOPRIGHT", -6, -24)
+
+  local bodyBG = selector:CreateTexture(nil, "BACKGROUND")
+  bodyBG:SetTexture("Interface\\PaperDollInfoFrame\\UI-Character-CharacterTab-L1")
+  bodyBG:SetTexCoord(0.255, 1, 0.39, 1)
+  bodyBG:SetPoint("TOPLEFT", 0, -24)
+  bodyBG:SetPoint("BOTTOMRIGHT", -6, 8)
+
+  local title = selector:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  title:SetPoint("TOPLEFT", 4, -8)
+  title:SetPoint("BOTTOMRIGHT", selector, "TOPRIGHT", -8, -24)
+  title:SetText("Blobs")
+
+  local toggle = CreateFrame("CheckButton", nil, scope.PANEL, "SpellBookSkillLineTabTemplate")
+  toggle:ClearAllPoints()
+  toggle:SetPoint("TOPLEFT", scope.PANEL, "TOPRIGHT", -2, -32)
+  toggle:Show()
+  toggle:SetScript("OnClick", function(self)
+    if self:GetChecked() then
+      scope:dispatch("ADDON_SELECTOR_SHOW")
+    else
+      scope:dispatch("ADDON_SELECTOR_HIDE")
+    end
+  end)
+  toggle.tooltip = "Blobs"
+  toggle:SetNormalTexture(3615513)
+  toggle:SetChecked(false)
+  selector.toggle = toggle
+  return selector
 end
 
 function scope.CreateEditorComponentFrames()
@@ -123,6 +183,15 @@ function scope.CreateEditorComponentFrames()
     scope:dispatch("ADDON_KEYBOARD_SHOW")
   end)
 
+  local deleteButton = CreateFrame("button", nil, scope.EDITOR, "UIPanelButtonTemplate")
+  deleteButton:SetPoint("LEFT", gutterBot, "LEFT", 2, 0)
+  deleteButton:SetText("Delete")
+  deleteButton:SetSize(80, 24)
+  deleteButton:SetEnabled(true)
+  deleteButton:SetScript("OnClick", function()
+    scope:dispatch("ADDON_KEYBOARD_SHOW")
+  end)
+
   local bodyScroller = CreateFrame("ScrollFrame", nil, scope.EDITOR, "OBroBindsEditorTemplate")
   scope.EDITOR.bodyScroller = bodyScroller
   bodyScroller:SetPoint("TOPLEFT", 18, -68)
@@ -143,5 +212,5 @@ function scope.CreateEditorComponentFrames()
 
   return iconButton, nameInput, scriptToggle,
     saveButton, cancelButton, closeButton,
-    bodyScroller, bodyInput
+    deleteButton, bodyScroller, bodyInput
 end

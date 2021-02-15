@@ -42,24 +42,6 @@ do
   end
 end
 
-function scope.UpdateUnknownSpells(next, ...)
-
-  for binding, action in scope.GetActions() do
-    if action.spell and not action.id then
-      local icon, _, _, _, id = select(3, GetSpellInfo(action.name))
-      action[2], action[4] = id, icon or action.icon
-
-    elseif action.blob and not action.script and action.icon == 134400 then
-      local macro = CreateMacro("__TMP__", "INV_MISC_QUESTIONMARK", action.body)
-      _, icon = GetMacroInfo(macro)
-      DeleteMacro(macro)
-      action[4] = icon or action.icon
-    end
-  end
-  return next(...)
-end
-
-
 function dbReadAction(...)
   return dbRead(CLASS, SPECC, ...)
 end
@@ -137,31 +119,17 @@ do
     end
   end
 
-  function scope.UpdateActionBlob(binding, id, body, icon)
-    deleteAction(binding, ACTION.blob)
-    if scope.match(true,
-      dbWriteAction(binding, ACTION.kind, ACTION.blob),
-      dbWriteAction(binding, ACTION.id,   id),
-      dbWriteAction(binding, ACTION.body, body),
-      dbWriteAction(binding, ACTION.icon, icon or 134400)) then
-      dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
-      return true
-    end
-  end
-
-  --function scropt.UpdateActiobBlobIcon(binding, )
-
-  function scope.UpdateAction(binding, kind, ...)
-    if kind == ACTION.spell then
-      return scope.UpdateActionSpell(binding, ...)
-    elseif kind == ACTION.item then
-      return scope.UpdateActionItem(binding, ...)
-    elseif kind == ACTION.macro then
-      return scope.UpdateActionMacro(binding, ...)
-    elseif kind == ACTION.blob then
-      return scope.UpdateActionBlob(binding, ...)
-    end
-  end
+  --function scope.UpdateActionBlob(binding, id, body, icon)
+    --deleteAction(binding, ACTION.blob)
+    --if scope.match(true,
+      --dbWriteAction(binding, ACTION.kind, ACTION.blob),
+      --dbWriteAction(binding, ACTION.id,   id),
+      --dbWriteAction(binding, ACTION.body, body),
+      --dbWriteAction(binding, ACTION.icon, icon or 134400)) then
+      --dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
+      --return true
+    --end
+  --end
 end
 
 function scope.UpdateActionLock(binding)
@@ -180,7 +148,7 @@ function scope.ActionIcon(action)
   elseif action.item then
     return select(10, GetItemInfo(action.id or 0)) or action.icon
   elseif action.blob then
-    return action.icon or 441148
+    return scope.dbRead("BLOBS", action.id, "icon") or 441148
   end
   return action.icon or nil
 end
@@ -223,12 +191,20 @@ do
       PickupMacro(macro)
       DeleteMacro(macro)
       scope.enqueue("CURSOR_UPDATE", cleanup)
-      --scope.__pickup = {unpack(action, 1, 6)}
       scope.__pickup = copy(scope.poolAcquire(nil), action)
     elseif action.kind then
       assert(false, "Unhandled pickup: "..action.kind)
     end
     return scope.DeleteAction(binding)
+  end
+  function scope.PickupBlob(index)
+    local macro = CreateMacro("__OBRO_TMP", scope.dbRead("BLOBS", index).icon)
+    PickupMacro(macro)
+    DeleteMacro(macro)
+    scope.__pickup = scope.poolAcquire(nil)
+    scope.__pickup[1] = "BLOB"
+    scope.__pickup[2] = index
+    scope.enqueue("CURSOR_UPDATE", cleanup)
   end
 end
 
@@ -306,22 +282,22 @@ function scope.PromoteToAction(binding)
   end
 end
 
-function scope.PromoteToMacroBlob(binding)
-  local _, name = string.match(GetBindingAction(binding, false), "^(%w+) (.*)$")
-  local _, icon, body = GetMacroInfo(name)
-  if icon and body then
-    return scope.UpdateActionBlob(binding, name, body, icon)
-  else
-    print("Macro", name, "not found")
-  end
-end
+--function scope.PromoteToMacroBlob(binding)
+  --local _, name = string.match(GetBindingAction(binding, false), "^(%w+) (.*)$")
+  --local _, icon, body = GetMacroInfo(name)
+  --if icon and body then
+    --return scope.UpdateActionBlob(binding, name, body, icon)
+  --else
+    --print("Macro", name, "not found")
+  --end
+--end
 
-function scope.PromoteToMacroBlobFromOverride(binding)
-  local name, icon = unpack(scope.GetAction(binding), 3, 4)
-  local mIcon, body = select(2, GetMacroInfo(name))
-  if not body then
-    print("Macro", name, "not found")
-    return false
-  end
-  return scope.UpdateActionBlob(binding, name, body, mIcon or icon)
-end
+--function scope.PromoteToMacroBlobFromOverride(binding)
+  --local name, icon = unpack(scope.GetAction(binding), 3, 4)
+  --local mIcon, body = select(2, GetMacroInfo(name))
+  --if not body then
+    --print("Macro", name, "not found")
+    --return false
+  --end
+  --return scope.UpdateActionBlob(binding, name, body, mIcon or icon)
+--end

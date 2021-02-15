@@ -5,8 +5,10 @@
   <Script file="deps\gui.frames.lua" />
   <Script file="deps\gui.keyboard.lua" />
   <Script file="deps\gui.editor.lua" />
+  <Script file="deps\gui.selector.lua" />
+  <Script file="deps\gui.misc.lua" />
 
-  <Button name="OBroBindsLineTemplate" mixin="OBroBindsLineMixin" inherits="ScrollListLineTemplate" virtual="true">
+  <Button name="OBroBindsIconLineTemplate" mixin="OBroBindsIconLineMixin" inherits="ScrollListLineTemplate" virtual="true">
     <Size>
       <AbsDimension y="40" />
     </Size>
@@ -19,7 +21,19 @@
     </Frames>
   </Button>
 
-  <Frame name="OBroBindsListTemplate" mixin="OBroBindsListMixin" inherits="ScrollListTemplate" virtual="true">
+  <Frame name="OBroBindsIconListTemplate" mixin="OBroBindsIconListMixin" inherits="ScrollListTemplate" virtual="true">
+    <Scripts>
+      <OnLoad method="OnLoad" />
+    </Scripts>
+  </Frame>
+
+  <Button name="OBroBindsBlobLineTemplate" mixin="OBroBindsBlobLineMixin" inherits="ScrollListLineTextTemplate" virtual="true">
+    <Size>
+      <AbsDimension y="24" />
+    </Size>
+  </Button>
+
+  <Frame name="OBroBindsBlobListTemplate" mixin="OBroBindsBlobListMixin" inherits="ScrollListTemplate" virtual="true">
     <Scripts>
       <OnLoad method="OnLoad" />
     </Scripts>

@@ -378,9 +378,9 @@ do
   end
 
   function scope.MACROBUTTONS:next(binding, action)
-    local button
-    if action.script then
-      local init, err = loadstring("local STACK, update, scope, binding = ...\n"..action.body)
+    local blob, button = scope.dbRead("BLOBS", action.id)
+    if blob.script then
+      local init, err = loadstring("local STACK, update, scope, binding = ...\n"..blob.body)
       if err then
         print("Error loading BLOB: "..err)
         return nil
@@ -402,7 +402,7 @@ do
       end
     else
       button = getNextButton()
-      button:SetAttribute("macrotext", action.body)
+      button:SetAttribute("macrotext", blob.body)
     end
     return button.command
   end

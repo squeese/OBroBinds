@@ -113,7 +113,7 @@ do
       end
       if action.blob then
         self.kind:Show()
-        self.Name:SetText(action.id)
+        self.Name:SetText(scope.dbRead("BLOBS", action.id, "name"))
       else
         self.kind:Hide()
       end
@@ -390,20 +390,20 @@ do
       button:Update()
     end
   end
-  local function PromoteToMacroBlobFromOverride(self, button, binding)
-    CloseDropDownMenus()
-    if scope.PromoteToMacroBlobFromOverride(binding) then
-      button:Update()
-    end
-  end
-  local function PromoteToMacroBlob(self, button, binding)
-    CloseDropDownMenus()
-    if scope.PromoteToMacroBlob(binding) then
-      SetBinding(binding, nil)
-      SaveBindings(GetCurrentBindingSet())
-      button:Update()
-    end
-  end
+  --local function PromoteToMacroBlobFromOverride(self, button, binding)
+    --CloseDropDownMenus()
+    --if scope.PromoteToMacroBlobFromOverride(binding) then
+      --button:Update()
+    --end
+  --end
+  --local function PromoteToMacroBlob(self, button, binding)
+    --CloseDropDownMenus()
+    --if scope.PromoteToMacroBlob(binding) then
+      --SetBinding(binding, nil)
+      --SaveBindings(GetCurrentBindingSet())
+      --button:Update()
+    --end
+  --end
   local function LockBinding(self, button, binding)
     CloseDropDownMenus()
     if scope.UpdateActionLock(binding) then
@@ -417,8 +417,11 @@ do
     end
   end
   local function EditBlob(self, button, binding)
+    local index = scope.GetAction(binding).id
     scope:dispatch("ADDON_EDITOR_SHOW")
-    scope:dispatch("ADDON_EDITOR_SELECT", binding)
+    scope:dispatch("ADDON_SELECTOR_SHOW")
+    scope:dispatch("ADDON_EDITOR_SELECT", index)
+    scope:dispatch("ADDON_SELECTOR_SELECT", index)
     CloseDropDownMenus()
   end
 
@@ -501,12 +504,12 @@ do
         info.func = RemoveOverride
         UIDropDownMenu_AddButton(info, 2)
       end
-      if action.macro then
-        reset()
-        info.text = "Promote to BLOB override"
-        info.func = PromoteToMacroBlobFromOverride
-        UIDropDownMenu_AddButton(info, 2)
-      end
+      --if action.macro then
+        --reset()
+        --info.text = "Promote to BLOB override"
+        --info.func = PromoteToMacroBlobFromOverride
+        --UIDropDownMenu_AddButton(info, 2)
+      --end
 
     elseif section == "binding" then
       local command = GetBindingAction(binding, false)
@@ -517,12 +520,12 @@ do
         info.func = PromoteToAction
         UIDropDownMenu_AddButton(info, 2)
       end
-      if kind == 'MACRO' then
-        reset()
-        info.text = "Promote to BLOB override"
-        info.func = PromoteToMacroBlob
-        UIDropDownMenu_AddButton(info, 2)
-      end
+      --if kind == 'MACRO' then
+        --reset()
+        --info.text = "Promote to BLOB override"
+        --info.func = PromoteToMacroBlob
+        --UIDropDownMenu_AddButton(info, 2)
+      --end
       reset()
       info.text = "Clear binding"
       info.func = RemoveBinding
