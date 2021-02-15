@@ -170,7 +170,7 @@ function scope.CreateEditorComponentFrames()
   end)
 
   local gutterBot = scope.EDITOR:CreateTexture(nil, "BACKGROUND")
-  gutterBot:SetPoint("TOPLEFT", scope.EDITOR, "BOTTOMLEFT", 8, 48)
+  gutterBot:SetPoint("TOPLEFT", scope.EDITOR, "BOTTOMLEFT", 8, 42)
   gutterBot:SetPoint("BOTTOMRIGHT", -8, 8)
   gutterBot:SetColorTexture(0, 0, 0, 0.5)
 
@@ -185,11 +185,11 @@ function scope.CreateEditorComponentFrames()
 
   local deleteButton = CreateFrame("button", nil, scope.EDITOR, "UIPanelButtonTemplate")
   deleteButton:SetPoint("LEFT", gutterBot, "LEFT", 2, 0)
-  deleteButton:SetText("Delete")
-  deleteButton:SetSize(80, 24)
+  deleteButton:SetText("x")
+  deleteButton:SetSize(24, 24)
   deleteButton:SetEnabled(true)
   deleteButton:SetScript("OnClick", function()
-    scope:dispatch("ADDON_KEYBOARD_SHOW")
+    scope:dispatch("ADDON_EDITOR_DELETE")
   end)
 
   local bodyScroller = CreateFrame("ScrollFrame", nil, scope.EDITOR, "OBroBindsEditorTemplate")

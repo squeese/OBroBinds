@@ -116,6 +116,39 @@ function scope.EditorChangeIcon(next, event, row, col, ...)
   return next(event, row, col, ...)
 end
 
+function scope.EditorDelete(next, ...)
+  scope.dbWrite("BLOBS", scope.splice, EDITOR.index)
+  for class in pairs(OBroBindsDB) do
+    if class ~= "GUI" and class ~= "BLOBS" then
+      for spec in pairs(OBroBindsDB[class]) do
+        for binding in pairs(OBroBindsDB[class][spec]) do
+          local action = setmetatable(OBroBindsDB[class][spec][binding], scope.ACTION)
+          if action.blob then
+            if action.id == EDITOR.index then
+              scope.dbWrite(class, spec, binding, nil)
+              if class == scope.CLASS and spec == scope.SPECC then
+                scope:dispatch("ADDON_ACTION_UPDATED", binding, scope.bindingModifiers(binding))
+              end
+            elseif action.id > EDITOR.index then
+              scope.dbWrite(class, spec, binding, scope.ACTION.id, action.id - 1)
+              if class == scope.CLASS and spec == scope.SPECC then
+                scope:dispatch("ADDON_ACTION_UPDATED", binding, scope.bindingModifiers(binding))
+              end
+            end
+          end
+          setmetatable(action, nil)
+        end
+      end
+    end
+  end
+  if scope.SELECTOR.list then
+    scope.SELECTOR.list:SetSelectedListIndex(nil, false)
+    scope.SELECTOR.list:RefreshListDisplay()
+  end
+  scope:dispatch("ADDON_KEYBOARD_SHOW")
+  return next(...)
+end
+
 hooksecurefunc("ChatEdit_InsertLink", function(text)
   if not text then return end
   if not scope.EDITOR:IsVisible() then return end

@@ -12,10 +12,6 @@ scope.enqueue("PLAYER_LOGIN", scope.poolAcquire(scope.STACK,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED", scope.UpdatePlayerVariables,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED", scope.UpdatePlayerBindings,
   scope.STACK.once, function(next, ...)
-    --scope.write(OBroBindsDB, "MONK", 1, nil)
-    --scope.write(OBroBindsDB, "MONK", 2, "4", nil)
-    --scope.write(OBroBindsDB, "MONK", 2, "5", nil)
-    --scope.write(OBroBindsDB, "MONK", 2, "7", nil)
     --OBroBindsDB.BLOBS = nil
     --for class in pairs(OBroBindsDB) do
       --if class ~= "GUI" and class ~= "BLOBS" then
@@ -61,10 +57,10 @@ scope.enqueue("ADDON_ROOT_SHOW", scope.poolAcquire(scope.STACK,
     scope.EDITOR = scope.CreateEditorFrame()
     scope.SELECTOR = scope.CreateSelectorFrame()
     scope:dispatch("ADDON_KEYBOARD_SHOW")
-    scope:dispatch("ADDON_SELECTOR_SHOW")
-    scope:dispatch("ADDON_EDITOR_SHOW")
-    scope:dispatch("ADDON_SELECTOR_SELECT", scope.GetAction("5").id)
-    scope:dispatch("ADDON_EDITOR_SELECT", scope.GetAction("5").id)
+    --scope:dispatch("ADDON_SELECTOR_SHOW")
+    --scope:dispatch("ADDON_EDITOR_SHOW")
+    --scope:dispatch("ADDON_SELECTOR_SELECT", scope.GetAction("5").id)
+    --scope:dispatch("ADDON_EDITOR_SELECT", scope.GetAction("5").id)
     --scope.SELECTOR.toggle:SetChecked(true)
     return next(...)
   end
@@ -142,6 +138,7 @@ scope.enqueue("ADDON_EDITOR_SHOW", scope.poolAcquire(scope.STACK,
   scope.STACK.enqueue, "ADDON_EDITOR_ICONS",         scope.EditorToggleIcons,
   scope.STACK.enqueue, "ADDON_EDITOR_CHANGE_ICON",   scope.EditorChangeIcon,
   scope.STACK.enqueue, "ADDON_EDITOR_SAVE",          scope.EditorSave,
+  scope.STACK.enqueue, "ADDON_EDITOR_DELETE",        scope.EditorDelete,
   scope.STACK.enqueue, "ADDON_EDITOR_UNDO",          scope.EditorUndo,
   scope.STACK.clear, scope.EditorCleanup
   --scope.STACK.setup, function(next, ...)
@@ -226,20 +223,6 @@ do
       scope.SELECTOR.list.ScrollFrame.scrollBar:SetValue(offset)
       return next(event, index, ...)
     end,
-    --scope.STACK.enqueue, "ADDON_SELECTOR_LOCK", function(next, event, locked, ...)
-      --if locked then
-        ----for _, button in ipairs(scope.SELECTOR.list.ScrollFrame.buttons) do
-          ----button:SetAlpha(0.5)
-          ----button.HighlightTexture:SetAlpha(0)
-        ----end
-      --else
-        ----for _, button in ipairs(scope.SELECTOR.list.ScrollFrame.buttons) do
-          ----button:SetAlpha(1)
-          ----button.HighlightTexture:SetAlpha(1)
-        ----end
-      --end
-      --return next(event, state, ...)
-    --end,
     scope.STACK.setup, function(next, ...)
       scope.SELECTOR:Show()
       scope.SELECTOR.toggle:SetPoint("TOPLEFT", scope.SELECTOR, "TOPRIGHT", -3, -32)

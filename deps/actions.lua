@@ -119,17 +119,15 @@ do
     end
   end
 
-  --function scope.UpdateActionBlob(binding, id, body, icon)
-    --deleteAction(binding, ACTION.blob)
-    --if scope.match(true,
-      --dbWriteAction(binding, ACTION.kind, ACTION.blob),
-      --dbWriteAction(binding, ACTION.id,   id),
-      --dbWriteAction(binding, ACTION.body, body),
-      --dbWriteAction(binding, ACTION.icon, icon or 134400)) then
-      --dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
-      --return true
-    --end
-  --end
+  function scope.UpdateActionBlob(binding, id)
+    deleteAction(binding, ACTION.blob)
+    if scope.match(true,
+      dbWriteAction(binding, ACTION.kind, ACTION.blob),
+      dbWriteAction(binding, ACTION.id, id)) then
+      dispatch(scope, "ADDON_ACTION_UPDATED", binding, bindingModifiers(binding))
+      return true
+    end
+  end
 end
 
 function scope.UpdateActionLock(binding)

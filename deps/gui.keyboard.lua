@@ -336,7 +336,8 @@ do
       end
     elseif action.blob then
       GameTooltip:SetText("BLOB "..action.id)
-      if action.script then
+      local blob = scope.dbRead("BLOBS", action.id)
+      if blob.script then
         local name = string.match(GetBindingAction(binding, true), "CLICK (OBroBindsSecureBlobButton%d+):LeftButton")
         local button = _G[name]
         if button then
@@ -344,7 +345,7 @@ do
           GameTooltip:AddLine(" ")
         end
       end
-      GameTooltip:AddLine(action.body)
+      GameTooltip:AddLine(blob.body)
       GameTooltip:Show()
 
     elseif GetBindingAction(binding, false) ~= "" then
@@ -412,17 +413,25 @@ do
   end
   local function CreateBlob(self, button, binding)
     CloseDropDownMenus()
-    if scope.UpdateActionBlob(binding, binding, "", 3615513) then
-      button:Update()
-    end
+    scope.dbWrite("BLOBS", scope.push, {
+      name = scope.CLASS.."_"..binding,
+      icon = 3615513,
+      body = "",
+    })
+    local index = #scope.dbRead("BLOBS")
+    scope.UpdateActionBlob(binding, index)
+    scope:dispatch("ADDON_EDITOR_SHOW")
+    scope:dispatch("ADDON_SELECTOR_SHOW")
+    scope:dispatch("ADDON_EDITOR_SELECT", index)
+    scope:dispatch("ADDON_SELECTOR_SELECT", index)
   end
   local function EditBlob(self, button, binding)
+    CloseDropDownMenus()
     local index = scope.GetAction(binding).id
     scope:dispatch("ADDON_EDITOR_SHOW")
     scope:dispatch("ADDON_SELECTOR_SHOW")
     scope:dispatch("ADDON_EDITOR_SELECT", index)
     scope:dispatch("ADDON_SELECTOR_SELECT", index)
-    CloseDropDownMenus()
   end
 
   local drop, info
