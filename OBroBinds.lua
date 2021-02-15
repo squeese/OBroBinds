@@ -1,10 +1,6 @@
 local scope = select(2, ...)
 scope.ROOT = scope.CreateRootFrame()
 
--- display selector
--- OBroBinds.blobs
--- tooltips for selector
-
 scope.enqueue("PLAYER_LOGIN", scope.poolAcquire(scope.STACK,
   scope.STACK.fold, nil,
   scope.STACK.once, scope.UpdatePlayerVariables,
@@ -12,31 +8,6 @@ scope.enqueue("PLAYER_LOGIN", scope.poolAcquire(scope.STACK,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED", scope.UpdatePlayerVariables,
   scope.STACK.enqueue, "PLAYER_SPECIALIZATION_CHANGED", scope.UpdatePlayerBindings,
   scope.STACK.once, function(next, ...)
-    --OBroBindsDB.BLOBS = nil
-    --for class in pairs(OBroBindsDB) do
-      --if class ~= "GUI" and class ~= "BLOBS" then
-        --for spec in pairs(OBroBindsDB[class]) do
-          --for binding in pairs(OBroBindsDB[class][spec]) do
-            --local action = setmetatable(OBroBindsDB[class][spec][binding], scope.ACTION)
-            --if action.blob then
-              --local id = class.."_"..action.id
-              --scope.write(OBroBindsDB, "BLOBS", scope.push, {
-                --name = id,
-                --body = action.body,
-                --icon = action.icon,
-                --script = action.script,
-              --})
-              --local index = #scope.read(OBroBindsDB, "BLOBS")
-              --scope.write(OBroBindsDB, class, spec, binding, 2, index)
-              --scope.write(OBroBindsDB, class, spec, binding, 3, nil) -- body
-              --scope.write(OBroBindsDB, class, spec, binding, 4, nil) -- icon
-              --scope.write(OBroBindsDB, class, spec, binding, 6, nil) -- script
-            --end
-            --setmetatable(action, nil)
-          --end
-        --end
-      --end
-    --end
     if scope.dbRead("GUI", "open") then
       scope:dispatch("ADDON_ROOT_SHOW")
     end
@@ -57,11 +28,6 @@ scope.enqueue("ADDON_ROOT_SHOW", scope.poolAcquire(scope.STACK,
     scope.EDITOR = scope.CreateEditorFrame()
     scope.SELECTOR = scope.CreateSelectorFrame()
     scope:dispatch("ADDON_KEYBOARD_SHOW")
-    --scope:dispatch("ADDON_SELECTOR_SHOW")
-    --scope:dispatch("ADDON_EDITOR_SHOW")
-    --scope:dispatch("ADDON_SELECTOR_SELECT", scope.GetAction("5").id)
-    --scope:dispatch("ADDON_EDITOR_SELECT", scope.GetAction("5").id)
-    --scope.SELECTOR.toggle:SetChecked(true)
     return next(...)
   end
 ))
@@ -141,97 +107,32 @@ scope.enqueue("ADDON_EDITOR_SHOW", scope.poolAcquire(scope.STACK,
   scope.STACK.enqueue, "ADDON_EDITOR_DELETE",        scope.EditorDelete,
   scope.STACK.enqueue, "ADDON_EDITOR_UNDO",          scope.EditorUndo,
   scope.STACK.clear, scope.EditorCleanup
-  --scope.STACK.setup, function(next, ...)
-    --scope.EDITOR.__height = scope.ROOT:GetHeight()
-    --scope.ROOT:SetHeight(500)
-    --return next(...)
-  --end,
-  --scope.STACK.clear, function(next, ...)
-    --scope.ROOT:SetHeight(scope.EDITOR.__height)
-    --scope.EDITOR.__height = nil
-    --return next(...)
-  --end
 ))
 
-
-do
-  OBroBindsBlobListMixin = {}
-  function OBroBindsBlobListMixin:OnLoad()
-    self.InsetFrame:Hide()
-    self.ScrollFrame.scrollBar.Background:Hide()
-    self.ScrollFrame.scrollBar.ScrollBarTop:Hide()
-    self.ScrollFrame.scrollBar.ScrollBarMiddle:Hide()
-    self.ScrollFrame.scrollBar.ScrollBarBottom:Hide()
-    self:SetElementTemplate("OBroBindsBlobLineTemplate")
-    self:SetGetNumResultsFunction(function(...)
-      return #(scope.dbRead("BLOBS") or scope.NIL)
-    end)
+scope.enqueue("ADDON_SELECTOR_SHOW", scope.poolAcquire(scope.STACK,
+  scope.STACK.fold, "ADDON_SELECTOR_HIDE",
+  scope.STACK.once, function(next, ...)
+    scope.SELECTOR:SetHeight(scope.ROOT:GetHeight())
+    scope.SELECTOR.list = CreateFrame("frame", nil, scope.SELECTOR, "OBroBindsBlobListTemplate")
+    scope.SELECTOR.list:SetPoint("TOPLEFT", 0, -23)
+    scope.SELECTOR.list:SetPoint("BOTTOMRIGHT", -1, 7)
+    return next(...)
+  end,
+  scope.STACK.enqueue, "ADDON_SELECTOR_SELECT", function(next, event, index, ...)
+    scope.SELECTOR.list:SetSelectedListIndex(index)
+    local offset = (index-1) * 24
+    HybridScrollFrame_SetOffset(scope.SELECTOR.list.ScrollFrame, offset)
+    scope.SELECTOR.list.ScrollFrame.scrollBar:SetValue(offset)
+    return next(event, index, ...)
+  end,
+  scope.STACK.setup, function(next, ...)
+    scope.SELECTOR:Show()
+    scope.SELECTOR.toggle:SetPoint("TOPLEFT", scope.SELECTOR, "TOPRIGHT", -3, -32)
+    return next(...)
+  end,
+  scope.STACK.clear, function(next, ...)
+    scope.SELECTOR:Hide()
+    scope.SELECTOR.toggle:SetPoint("TOPLEFT", scope.PANEL, "TOPRIGHT", -2, -32)
+    return next(...)
   end
-
-  function OBroBindsBlobListMixin:AttachHighlightToElementFrame(selectedHighlight, elementFrame)
-    selectedHighlight:SetPoint("TOPLEFT", elementFrame, "TOPLEFT", 0, 0);
-    selectedHighlight:SetPoint("BOTTOMRIGHT", elementFrame, "BOTTOMRIGHT", 0, 0);
-    selectedHighlight:Show();
-  end
-
-  local function OnDragStart(self)
-    scope.PickupBlob(self.listIndex)
-  end
-
-  OBroBindsBlobLineMixin = {}
-  function OBroBindsBlobLineMixin:InitElement(...)
-    local height = self:GetHeight()
-    self.icon = self:CreateTexture(nil, "BACKGROUND")
-    self.icon:SetPoint("TOPLEFT", 0, 0)
-    self.icon:SetPoint("BOTTOMRIGHT", self, "BOTTOMLEFT", height-1, 1)
-    self.icon:SetTexCoord(0.1, 0.9, 0.1, 0.9)
-    self.Text:SetPoint("LEFT", height + 2, 0)
-    self:SetScript("OnDragStart", OnDragStart)
-    self:RegisterForDrag("LeftButton")
-  end
-
-  function OBroBindsBlobLineMixin:UpdateDisplay()
-    local blob = scope.dbRead("BLOBS", self.listIndex)
-    self.Text:SetText(blob.name)
-    self.icon:SetTexture(blob.icon)
-  end
-
-  function OBroBindsBlobLineMixin:OnClick()
-    if not scope.EDITOR.DIRTY then
-      TemplatedListElementMixin.OnClick(self)
-    end
-  end
-
-  function OBroBindsBlobLineMixin:OnSelected()
-    scope:dispatch("ADDON_EDITOR_SHOW")
-    scope:dispatch("ADDON_EDITOR_SELECT", self.listIndex)
-  end
-
-  scope.enqueue("ADDON_SELECTOR_SHOW", scope.poolAcquire(scope.STACK,
-    scope.STACK.fold, "ADDON_SELECTOR_HIDE",
-    scope.STACK.once, function(next, ...)
-      scope.SELECTOR:SetHeight(scope.ROOT:GetHeight())
-      scope.SELECTOR.list = CreateFrame("frame", nil, scope.SELECTOR, "OBroBindsBlobListTemplate")
-      scope.SELECTOR.list:SetPoint("TOPLEFT", 0, -23)
-      scope.SELECTOR.list:SetPoint("BOTTOMRIGHT", -1, 7)
-      return next(...)
-    end,
-    scope.STACK.enqueue, "ADDON_SELECTOR_SELECT", function(next, event, index, ...)
-      scope.SELECTOR.list:SetSelectedListIndex(index)
-      local offset = (index-1) * 24
-      HybridScrollFrame_SetOffset(scope.SELECTOR.list.ScrollFrame, offset)
-      scope.SELECTOR.list.ScrollFrame.scrollBar:SetValue(offset)
-      return next(event, index, ...)
-    end,
-    scope.STACK.setup, function(next, ...)
-      scope.SELECTOR:Show()
-      scope.SELECTOR.toggle:SetPoint("TOPLEFT", scope.SELECTOR, "TOPRIGHT", -3, -32)
-      return next(...)
-    end,
-    scope.STACK.clear, function(next, ...)
-      scope.SELECTOR:Hide()
-      scope.SELECTOR.toggle:SetPoint("TOPLEFT", scope.PANEL, "TOPRIGHT", -2, -32)
-      return next(...)
-    end
-  ))
-end
+))
